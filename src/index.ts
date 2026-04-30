@@ -166,4 +166,8 @@ async function startServer() {
   }
 }
 
-startServer();
+if (process.env.NODE_ENV !== "production" || !process.env.VERCEL) {
+  startServer();
+}
+
+export default app;
