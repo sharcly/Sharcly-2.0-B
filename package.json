@@ -9,7 +9,8 @@
     "build": "tsc",
     "bootstrap": "ts-node src/common/utils/bootstrap.ts",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "postinstall": "prisma generate"
   },
   "keywords": [],
   "author": "",

@@ -44,7 +44,7 @@ export class StatsService {
     });
 
     // Group by day
-    const revenueByDay = orders.reduce((acc: any, order) => {
+    const revenueByDay = orders.reduce((acc: any, order: any) => {
       const date = order.createdAt.toISOString().split('T')[0];
       acc[date] = (acc[date] || 0) + Number(order.totalAmount);
       return acc;
@@ -85,7 +85,7 @@ export class StatsService {
         activeNow: activeNow + 5
       },
       chartData,
-      recentTransactions: recentTransactions.map(t => ({
+      recentTransactions: recentTransactions.map((t: any) => ({
         id: t.id,
         name: t.user?.name || "Customer",
         email: t.user?.email || "Unknown",

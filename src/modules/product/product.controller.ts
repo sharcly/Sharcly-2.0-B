@@ -38,12 +38,12 @@ export const getProducts = async (req: Request, res: Response) => {
     ]);
 
     res.status(200).json({
-      products: products.map(p => ({
+      products: products.map((p: any) => ({
         ...p,
         price: Number(p.price),
-        variants: p.variants.map(v => ({ ...v, price: Number(v.price) })),
+        variants: p.variants.map((v: any) => ({ ...v, price: Number(v.price) })),
         // Map images to internal API URLs
-        imageUrls: p.images.map(img => `/api/images/${img.id}`)
+        imageUrls: p.images.map((img: any) => `/api/images/${img.id}`)
       })),
       pagination: {
         total,
@@ -80,8 +80,8 @@ export const getProductBySlug = async (req: Request, res: Response) => {
       product: {
         ...product,
         price: Number(product.price),
-        variants: product.variants.map(v => ({ ...v, price: Number(v.price) })),
-        imageUrls: product.images.map(img => `/api/images/${img.id}`)
+        variants: product.variants.map((v: any) => ({ ...v, price: Number(v.price) })),
+        imageUrls: product.images.map((img: any) => `/api/images/${img.id}`)
       }
     });
   } catch (error) {
