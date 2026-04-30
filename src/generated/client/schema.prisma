@@ -1,0 +1,379 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/client"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Role {
+  id          String           @id @default(uuid())
+  name        String           @unique
+  slug        String           @unique
+  description String?
+  users       User[]
+  permissions RolePermission[]
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@map("roles")
+}
+
+model Permission {
+  id          String           @id @default(uuid())
+  name        String           @unique
+  slug        String           @unique
+  description String?
+  group       String           @default("General")
+  roles       RolePermission[]
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleId       String
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permissionId String
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+enum OrderStatus {
+  PENDING
+  ACCEPTED
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
+model User {
+  id                String    @id @default(uuid())
+  email             String    @unique
+  password          String
+  name              String?
+  roleId            String?
+  role              Role?     @relation(fields: [roleId], references: [id])
+  isBlocked         Boolean   @default(false)
+  isEmailVerified   Boolean   @default(false)
+  verificationToken String?
+  refreshToken      String?   @unique
+  addresses         Address[]
+  orders            Order[]
+  blogs             Blog[]
+  reviews           Review[]
+  wishlist          Product[] @relation("UserWishlist")
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@map("users")
+}
+
+model Address {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  street    String
+  city      String
+  state     String
+  zipCode   String
+  country   String
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("addresses")
+}
+
+model Category {
+  id          String    @id @default(uuid())
+  name        String    @unique
+  slug        String    @unique
+  description String?   @db.Text
+  products    Product[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@map("categories")
+}
+
+model Product {
+  id           String         @id @default(uuid())
+  name         String
+  slug         String         @unique
+  sku          String?        @unique
+  description  String
+  price        Decimal
+  stock        Int            @default(0)
+  categoryId   String
+  category     Category       @relation(fields: [categoryId], references: [id])
+  images       ProductImage[]
+  reviews      Review[]
+  orderItems   OrderItem[]
+  wishlistedBy User[]         @relation("UserWishlist")
+  collections  Collection[]   @relation("ProductCollections")
+  typeId       String?
+  type         ProductType?   @relation(fields: [typeId], references: [id])
+  tags         ProductTag[]   @relation("ProductToTag")
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  @@map("products")
+}
+
+model ProductImage {
+  id        String   @id @default(uuid())
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  data      Bytes
+  mimeType  String   @default("image/webp")
+  altText   String? // SEO ALT Text
+  createdAt DateTime @default(now())
+
+  @@map("product_images")
+}
+
+model Order {
+  id                String      @id @default(uuid())
+  userId            String
+  user              User        @relation(fields: [userId], references: [id])
+  status            OrderStatus @default(PENDING)
+  totalAmount       Decimal
+  address           String
+  items             OrderItem[]
+  couponId          String?
+  coupon            Coupon?     @relation(fields: [couponId], references: [id])
+  trackingNumber    String?
+  carrier           String?
+  estimatedDelivery DateTime?
+  notes             String?
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id        String  @id @default(uuid())
+  orderId   String
+  order     Order   @relation(fields: [orderId], references: [id])
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+  quantity  Int
+  price     Decimal
+
+  @@map("order_items")
+}
+
+model Blog {
+  id        String   @id @default(uuid())
+  title     String
+  slug      String   @unique
+  content   String
+  authorId  String
+  author    User     @relation(fields: [authorId], references: [id])
+  metaTitle String?
+  metaDesc  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("blogs")
+}
+
+model Coupon {
+  id         String   @id @default(uuid())
+  code       String   @unique
+  discount   Decimal
+  expiryDate DateTime
+  usageLimit Int      @default(1)
+  usedCount  Int      @default(0)
+  orders     Order[]
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("coupons")
+}
+
+model Review {
+  id        String   @id @default(uuid())
+  productId String
+  product   Product  @relation(fields: [productId], references: [id])
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  rating    Int
+  comment   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([productId, userId])
+  @@map("reviews")
+}
+
+model CmsContent {
+  id        String   @id @default(uuid())
+  page      String // e.g., "home", "about"
+  section   String // e.g., "hero", "process"
+  key       String // e.g., "title", "description"
+  value     String   @db.Text
+  type      String   @default("text") // text, image_url, json
+  updatedAt DateTime @updatedAt
+
+  @@unique([page, section, key])
+  @@map("cms_content")
+}
+
+model Collection {
+  id          String    @id @default(uuid())
+  name        String    @unique
+  slug        String    @unique
+  description String?   @db.Text
+  products    Product[] @relation("ProductCollections")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@map("collections")
+}
+
+model StoreSettings {
+  id           String   @id @default(uuid())
+  storeName    String   @default("Scarly 2.0")
+  supportEmail String?
+  currency     String   @default("USD")
+  logoUrl      String?
+  updatedAt    DateTime @updatedAt
+
+  @@map("store_settings")
+}
+
+model GlobalSeoSettings {
+  id                     String   @id @default(uuid())
+  siteName               String   @default("Scarly 2.0")
+  siteDescription        String?  @db.Text
+  googleAnalyticsId      String?
+  facebookPixelId        String?
+  googleSiteVerification String?
+  robotsTxt              String?  @db.Text
+  sitemapUrl             String?
+  globalMetaTags         String?  @db.Text // JSON string for custom meta tags
+  updatedAt              DateTime @updatedAt
+
+  @@map("global_seo_settings")
+}
+
+model Region {
+  id           String   @id @default(uuid())
+  name         String   @unique
+  currencyCode String
+  taxRate      Decimal  @default(0)
+  countries    String[]
+  updatedAt    DateTime @updatedAt
+
+  @@map("regions")
+}
+
+model ProductType {
+  id        String    @id @default(uuid())
+  name      String    @unique
+  products  Product[]
+  createdAt DateTime  @default(now())
+
+  @@map("product_types")
+}
+
+model ProductTag {
+  id        String    @id @default(uuid())
+  name      String    @unique
+  products  Product[] @relation("ProductToTag")
+  createdAt DateTime  @default(now())
+
+  @@map("product_tags")
+}
+
+model ReturnReason {
+  id          String  @id @default(uuid())
+  label       String  @unique
+  value       String  @unique
+  description String?
+
+  @@map("return_reasons")
+}
+
+model RefundReason {
+  id          String  @id @default(uuid())
+  label       String  @unique
+  value       String  @unique
+  description String?
+
+  @@map("refund_reasons")
+}
+
+// ─── SEO Management ─────────────────────────────────────────────────────────
+
+model SeoMeta {
+  id             String   @id @default(uuid())
+  pageSlug       String   @unique // e.g., "home", "about", "products", "contact", "blog"
+  title          String?
+  description    String?  @db.Text
+  keywords       String?  @db.Text
+  ogTitle        String?
+  ogDescription  String?  @db.Text
+  ogImage        String?
+  canonicalUrl   String?
+  robots         String   @default("index, follow") // "noindex", "nofollow", etc.
+  structuredData String?  @db.Text // JSON-LD structured data
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@map("seo_meta")
+}
+
+// ─── Shipping Management ────────────────────────────────────────────────────
+
+model ShippingZone {
+  id        String         @id @default(uuid())
+  name      String         @unique // e.g., "Domestic", "International", "Metro Cities"
+  countries String[]
+  states    String[]
+  isActive  Boolean        @default(true)
+  rates     ShippingRate[]
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  @@map("shipping_zones")
+}
+
+model ShippingRate {
+  id             String         @id @default(uuid())
+  zoneId         String
+  zone           ShippingZone   @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+  methodId       String
+  method         ShippingMethod @relation(fields: [methodId], references: [id], onDelete: Cascade)
+  minWeight      Decimal        @default(0) // in grams
+  maxWeight      Decimal? // null = unlimited
+  minOrderAmount Decimal        @default(0) // min cart value for this rate
+  price          Decimal // shipping charge
+  freeAbove      Decimal? // free shipping above this order amount
+  estimatedDays  Int            @default(5) // estimated delivery days
+  isActive       Boolean        @default(true)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  @@map("shipping_rates")
+}
+
+model ShippingMethod {
+  id          String         @id @default(uuid())
+  name        String         @unique // e.g., "Standard", "Express", "Overnight"
+  code        String         @unique // e.g., "standard", "express", "overnight"
+  description String?
+  isActive    Boolean        @default(true)
+  rates       ShippingRate[]
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@map("shipping_methods")
+}

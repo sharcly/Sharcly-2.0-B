@@ -1,0 +1,545 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Role {
+  id          String           @id @default(uuid())
+  name        String           @unique
+  slug        String           @unique
+  description String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  permissions RolePermission[]
+  users       User[]
+
+  @@map("roles")
+}
+
+model Permission {
+  id          String           @id @default(uuid())
+  name        String           @unique
+  slug        String           @unique
+  description String?
+  group       String           @default("General")
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  roles       RolePermission[]
+
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+model User {
+  id                String    @id @default(uuid())
+  email             String    @unique
+  password          String
+  name              String?
+  roleId            String?
+  isBlocked         Boolean   @default(false)
+  isEmailVerified   Boolean   @default(false)
+  verificationToken String?
+  refreshToken      String?   @unique
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  addresses         Address[]
+  blogs             Blog[]
+  orders            Order[]
+  reviews           Review[]
+  userRole          Role?     @relation(fields: [roleId], references: [id])
+  wishlist          Product[] @relation("UserWishlist")
+
+  @@map("users")
+}
+
+model Address {
+  id        String   @id @default(uuid())
+  userId    String
+  street    String
+  city      String
+  state     String
+  zipCode   String
+  country   String
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@map("addresses")
+}
+
+model Category {
+  id          String     @id @default(uuid())
+  name        String     @unique
+  slug        String     @unique
+  description String?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  parentId    String?
+  parent      Category?  @relation("CategoryToCategory", fields: [parentId], references: [id])
+  children    Category[] @relation("CategoryToCategory")
+  products    Product[]
+
+  @@map("categories")
+}
+
+model Product {
+  id              String           @id @default(uuid())
+  name            String
+  slug            String           @unique
+  sku             String?          @unique
+  description     String
+  price           Decimal
+  stock           Int              @default(0)
+  categoryId      String
+  typeId          String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  canonicalUrl    String?
+  changefreq      String?          @default("monthly")
+  discountable    Boolean          @default(true)
+  height          Float?
+  hsCode          String?
+  keywords        String?
+  length          Float?
+  material        String?
+  metaDescription String?
+  metaTitle       String?
+  metadata        Json?
+  midCode         String?
+  ogImage         String?
+  options         Json?
+  originCountry   String?
+  status          ProductStatus    @default(DRAFT)
+  subtitle        String?
+  weight          Float?
+  width           Float?
+  tags            ProductTag[]     @relation("ProductToTag")
+  orderItems      OrderItem[]
+  images          ProductImage[]
+  variants        ProductVariant[]
+  category        Category         @relation(fields: [categoryId], references: [id])
+  type            ProductType?     @relation(fields: [typeId], references: [id])
+  reviews         Review[]
+  collections     Collection[]     @relation("ProductCollections")
+  wishlistedBy    User[]           @relation("UserWishlist")
+
+  @@map("products")
+}
+
+model ProductVariant {
+  id                String   @id @default(uuid())
+  productId         String
+  title             String
+  sku               String?  @unique
+  price             Decimal
+  inventoryQuantity Int      @default(0)
+  manageInventory   Boolean  @default(true)
+  allowBackorder    Boolean  @default(false)
+  options           Json?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  image             String?
+  product           Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@map("product_variants")
+}
+
+model ProductImage {
+  id          String   @id @default(uuid())
+  productId   String
+  createdAt   DateTime @default(now())
+  isThumbnail Boolean  @default(false)
+  order       Int      @default(0)
+  url         String?
+  data        Bytes?
+  mimeType    String?
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@map("product_images")
+}
+
+model Order {
+  id                String      @id @default(uuid())
+  userId            String
+  status            OrderStatus @default(PENDING)
+  totalAmount       Decimal
+  taxAmount         Decimal     @default(0)
+  shippingAmount    Decimal     @default(0)
+  address           String?
+  shippingAddress   String
+  billingAddress    String?
+  paymentMethod     String?
+  couponId          String?
+  trackingNumber    String?
+  carrier           String?
+  estimatedDelivery DateTime?
+  notes             String?
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  items             OrderItem[]
+  coupon            Coupon?     @relation(fields: [couponId], references: [id])
+  user              User        @relation(fields: [userId], references: [id])
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id        String  @id @default(uuid())
+  orderId   String
+  productId String
+  quantity  Int
+  price     Decimal
+  order     Order   @relation(fields: [orderId], references: [id])
+  product   Product @relation(fields: [productId], references: [id])
+
+  @@map("order_items")
+}
+
+model Blog {
+  id              String     @id @default(uuid())
+  title           String
+  slug            String     @unique
+  content         String
+  authorId        String
+  metaTitle       String?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+  category        String?
+  excerpt         String?
+  featuredImage   String?
+  keywords        String?
+  metaDescription String?
+  publishedAt     DateTime?
+  status          BlogStatus @default(DRAFT)
+  tags            String[]
+  author          User       @relation(fields: [authorId], references: [id])
+}
+
+enum DiscountType {
+  PERCENTAGE
+  FIXED
+}
+
+model Coupon {
+  id           String       @id @default(uuid())
+  code         String       @unique
+  discount     Decimal
+  discountType DiscountType @default(PERCENTAGE)
+  expiryDate   DateTime
+  usageLimit   Int          @default(1)
+  usedCount    Int          @default(0)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  orders       Order[]
+
+  @@map("coupons")
+}
+
+model WelcomeOffer {
+  id          String   @id @default(uuid())
+  title       String
+  description String
+  discount    Decimal
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  claims      OfferClaim[]
+
+  @@map("welcome_offers")
+}
+
+model OfferClaim {
+  id             String       @id @default(uuid())
+  welcomeOfferId String
+  email          String       @unique
+  phone          String
+  couponCode     String
+  createdAt      DateTime     @default(now())
+  welcomeOffer   WelcomeOffer @relation(fields: [welcomeOfferId], references: [id])
+
+  @@map("offer_claims")
+}
+
+
+model Review {
+  id        String   @id @default(uuid())
+  productId String
+  userId    String
+  rating    Int
+  comment   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  product   Product  @relation(fields: [productId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@unique([productId, userId])
+  @@map("reviews")
+}
+
+model CmsContent {
+  id        String   @id @default(uuid())
+  page      String
+  section   String
+  key       String
+  value     String
+  type      String   @default("text")
+  updatedAt DateTime @updatedAt
+
+  @@unique([page, section, key])
+  @@map("cms_content")
+}
+
+model Collection {
+  id          String    @id @default(uuid())
+  name        String    @unique
+  slug        String    @unique
+  description String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  products    Product[] @relation("ProductCollections")
+
+  @@map("collections")
+}
+
+model StoreSettings {
+  id                    String   @id @default(uuid())
+  storeName             String   @default("Sharcly")
+  supportEmail          String?
+  currency              String   @default("USD")
+  logoUrl               String?
+  updatedAt             DateTime @updatedAt
+  buttonRadius          String   @default("2rem")
+  freeShippingThreshold Decimal  @default(0)
+  navbarStyle           String   @default("transparent")
+  primaryColor          String   @default("#000000")
+  secondaryColor        String   @default("#ffffff")
+  shippingCharge        Decimal  @default(0)
+  siteTheme             String   @default("light")
+  taxRate               Decimal  @default(0)
+
+  @@map("store_settings")
+}
+
+model GlobalSeoSettings {
+  id                     String   @id @default(uuid())
+  siteName               String   @default("Sharcly")
+  siteDescription        String?
+  googleAnalyticsId      String?
+  facebookPixelId        String?
+  googleSiteVerification String?
+  klaviyoPublicKey       String?
+  klaviyoPrivateKey      String?
+  robotsTxt              String?
+  sitemapUrl             String?
+  globalMetaTags         String?
+  updatedAt              DateTime @updatedAt
+
+  @@map("global_seo_settings")
+}
+
+model Region {
+  id           String   @id @default(uuid())
+  name         String   @unique
+  currencyCode String
+  taxRate      Decimal  @default(0)
+  countries    String[]
+  updatedAt    DateTime @updatedAt
+
+  @@map("regions")
+}
+
+model ProductType {
+  id        String    @id @default(uuid())
+  name      String    @unique
+  createdAt DateTime  @default(now())
+  products  Product[]
+
+  @@map("product_types")
+}
+
+model ProductTag {
+  id           String         @id @default(uuid())
+  name         String         @unique
+  createdAt    DateTime       @default(now())
+  products     Product[]      @relation("ProductToTag")
+
+  @@map("product_tags")
+}
+
+model ReturnReason {
+  id          String  @id @default(uuid())
+  label       String  @unique
+  value       String  @unique
+  description String?
+
+  @@map("return_reasons")
+}
+
+model RefundReason {
+  id          String  @id @default(uuid())
+  label       String  @unique
+  value       String  @unique
+  description String?
+
+  @@map("refund_reasons")
+}
+
+model SeoMeta {
+  id             String   @id @default(uuid())
+  pageSlug       String   @unique
+  title          String?
+  description    String?
+  keywords       String?
+  ogTitle        String?
+  ogDescription  String?
+  ogImage        String?
+  canonicalUrl   String?
+  robots         String?  @default("index, follow")
+  structuredData String?
+  updatedAt      DateTime @updatedAt
+
+  @@map("seo_meta")
+}
+
+model ShippingMethod {
+  id          String         @id @default(uuid())
+  name        String         @unique
+  code        String         @unique
+  description String?
+  isActive    Boolean        @default(true)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  rates       ShippingRate[]
+
+  @@map("shipping_methods")
+}
+
+model ShippingZone {
+  id        String         @id @default(uuid())
+  name      String         @unique
+  countries String[]       @default([])
+  states    String[]       @default([])
+  isActive  Boolean        @default(true)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  rates     ShippingRate[]
+
+  @@map("shipping_zones")
+}
+
+model ShippingRate {
+  id             String         @id @default(uuid())
+  zoneId         String
+  methodId       String
+  minWeight      Decimal        @default(0)
+  maxWeight      Decimal?
+  minOrderAmount Decimal        @default(0)
+  price          Decimal
+  freeAbove      Decimal?
+  estimatedDays  Int            @default(5)
+  isActive       Boolean        @default(true)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  method         ShippingMethod @relation(fields: [methodId], references: [id], onDelete: Cascade)
+  zone           ShippingZone   @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+
+  @@map("shipping_rates")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PREPARING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
+enum ProductStatus {
+  DRAFT
+  PUBLISHED
+}
+
+enum BlogStatus {
+  DRAFT
+  PUBLISHED
+  SCHEDULED
+}
+
+model WholesaleInquiry {
+  id              String   @id @default(uuid())
+  businessName    String   @map("business_name")
+  contactName     String   @map("contact_name")
+  email           String
+  phone           String
+  businessType    String   @map("business_type")
+  estimatedVolume String?  @map("estimated_volume")
+  message         String?
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@map("wholesale_inquiries")
+}
+
+model PricingPlan {
+  id        String   @id @default(uuid())
+  name      String
+  minOrder  String   @map("min_order")
+  discount  String
+  features  Json
+  featured  Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("pricing_plans")
+}
+
+model Testimonial {
+  id        String   @id @default(uuid())
+  name      String
+  role      String
+  company   String?
+  message   String   @db.Text
+  rating    Int?
+  image     String?
+  featured  Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("testimonials")
+}
+
+model ApiIntegration {
+  id        String   @id @default(uuid())
+  platform  String   @unique
+  apiKey    String
+  config    Json?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("api_integrations")
+}
+
+model Otp {
+  id        String   @id @default(uuid())
+  email     String
+  code      String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@map("otps")
+}

@@ -1,0 +1,4 @@
+ALTER TABLE product_variants ADD COLUMN IF NOT EXISTS image TEXT;
+ALTER TABLE product_images DROP COLUMN IF EXISTS data;
+ALTER TABLE product_images DROP COLUMN IF EXISTS "mimeType";
+ALTER TABLE product_images ADD COLUMN IF NOT EXISTS url TEXT;

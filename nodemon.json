@@ -1,0 +1,8 @@
+{
+  "watch": ["src"],
+  "ext": "ts,json",
+  "exec": "npm run kill-port && ts-node src/index.ts",
+  "signal": "SIGTERM",
+  "delay": "1000",
+  "ignore": ["node_modules", "dist", "coverage"]
+}
