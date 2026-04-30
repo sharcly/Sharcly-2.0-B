@@ -99,7 +99,7 @@ export class OrderService {
     totalAmount += taxAmount + shippingCost;
 
     // Create order, update stock, and increment coupon usage all in ONE atomic transaction
-    const order = await prisma.$transaction(async (tx) => {
+    const order = await prisma.$transaction(async (tx: any) => {
       // If coupon is used, re-validate inside transaction to prevent race conditions
       if (couponId) {
         const coupon = await tx.coupon.findUnique({ where: { id: couponId } });
@@ -188,7 +188,7 @@ export class OrderService {
     });
 
     const settings = await prisma.storeSettings.findFirst();
-    return orders.map(order => this.applyLegacyFallback(order, settings));
+    return orders.map((order: any) => this.applyLegacyFallback(order, settings));
   }
 
   static async getAllOrders() {
@@ -201,7 +201,7 @@ export class OrderService {
     });
 
     const settings = await prisma.storeSettings.findFirst();
-    return orders.map(order => this.applyLegacyFallback(order, settings));
+    return orders.map((order: any) => this.applyLegacyFallback(order, settings));
   }
 
   static async getOrderById(id: string) {

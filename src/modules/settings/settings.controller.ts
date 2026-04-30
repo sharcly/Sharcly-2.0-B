@@ -41,7 +41,7 @@ export const createRegion = async (req: Request, res: Response) => {
 export const deleteRegion = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    await SettingsService.deleteRegion(id);
+    await SettingsService.deleteRegion(id as string);
     res.status(200).json({ success: true, message: "Region deleted" });
   } catch (error) {
     res.status(500).json({ message: "Failed to delete region" });
