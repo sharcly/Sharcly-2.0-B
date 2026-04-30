@@ -11,7 +11,7 @@ const crypto_1 = __importDefault(require("crypto"));
 const email_service_1 = require("./email.service");
 const ACCESS_TOKEN_SECRET = process.env.JWT_SECRET || "fallback_access_secret";
 const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET || "fallback_refresh_secret";
-const ACCESS_TOKEN_EXPIRY = "24h";
+const ACCESS_TOKEN_EXPIRY = "1h";
 const REFRESH_TOKEN_EXPIRY = "7d";
 if (process.env.NODE_ENV === "production") {
     if (!process.env.JWT_SECRET || !process.env.REFRESH_TOKEN_SECRET) {
@@ -29,10 +29,15 @@ class AuthService {
         return { accessToken, refreshToken };
     }
     static async register(registerData) {
-        const { email, password, name } = registerData;
+        const { email, password, name, otp } = registerData;
         const existingUser = await prisma_1.prisma.user.findUnique({ where: { email } });
         if (existingUser) {
             throw new Error("User already exists");
+        }
+        // Verify OTP
+        const otpRecord = await prisma_1.prisma.otp.findUnique({ where: { email } });
+        if (!otpRecord || otpRecord.code !== otp || otpRecord.expiresAt < new Date()) {
+            throw new Error("Invalid or expired verification code.");
         }
         const hashedPassword = await bcryptjs_1.default.hash(password, 12);
         const verificationToken = crypto_1.default.randomBytes(32).toString("hex");
@@ -83,6 +88,28 @@ class AuthService {
             data: { isEmailVerified: true, verificationToken: null }
         });
     }
+    static async sendOtp(email) {
+        // Check if user already exists
+        const existingUser = await prisma_1.prisma.user.findUnique({ where: { email } });
+        if (existingUser) {
+            throw new Error("An account with this email already exists.");
+        }
+        const code = Math.floor(100000 + Math.random() * 900000).toString();
+        const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+        await prisma_1.prisma.otp.upsert({
+            where: { email },
+            update: { code, expiresAt },
+            create: { email, code, expiresAt }
+        });
+        try {
+            await (0, email_service_1.sendOtpEmail)(email, code);
+        }
+        catch (error) {
+            console.error("Failed to send OTP:", error);
+            throw new Error("Failed to send verification code. Please try again.");
+        }
+        return true;
+    }
     static async login(loginData) {
         const { email, password } = loginData;
         const user = await prisma_1.prisma.user.findUnique({
@@ -95,7 +122,7 @@ class AuthService {
             throw new Error("Invalid credentials");
         }
         if (user.isBlocked) {
-            throw new Error("Your account is blocked");
+            throw new Error("Your account is blocked. Please contact admin for support.");
         }
         const isMatch = await bcryptjs_1.default.compare(password, user.password);
         if (!isMatch) {

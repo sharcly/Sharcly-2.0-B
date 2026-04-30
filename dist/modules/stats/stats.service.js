@@ -80,7 +80,7 @@ class StatsService {
                 activeNow: activeNow + 5
             },
             chartData,
-            recentTransactions: recentTransactions.map(t => ({
+            recentTransactions: recentTransactions.map((t) => ({
                 id: t.id,
                 name: t.user?.name || "Customer",
                 email: t.user?.email || "Unknown",

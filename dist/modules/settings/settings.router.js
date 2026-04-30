@@ -13,6 +13,7 @@ router.put("/", auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)
 // Regions
 router.get("/regions", auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)("settings.manage"), settings_controller_1.getRegions);
 router.post("/regions", auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)("settings.manage"), settings_controller_1.createRegion);
+router.delete("/regions/:id", auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)("settings.manage"), settings_controller_1.deleteRegion);
 // Reasons
 router.get("/return-reasons", auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)("settings.manage"), settings_controller_1.getReturnReasons);
 router.get("/refund-reasons", auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)("settings.manage"), settings_controller_1.getRefundReasons);

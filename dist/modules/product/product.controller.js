@@ -37,12 +37,12 @@ const getProducts = async (req, res) => {
             prisma_1.prisma.product.count({ where })
         ]);
         res.status(200).json({
-            products: products.map(p => ({
+            products: products.map((p) => ({
                 ...p,
                 price: Number(p.price),
-                variants: p.variants.map(v => ({ ...v, price: Number(v.price) })),
+                variants: p.variants.map((v) => ({ ...v, price: Number(v.price) })),
                 // Map images to internal API URLs
-                imageUrls: p.images.map(img => `/api/images/${img.id}`)
+                imageUrls: p.images.map((img) => `/api/images/${img.id}`)
             })),
             pagination: {
                 total,
@@ -79,8 +79,8 @@ const getProductBySlug = async (req, res) => {
             product: {
                 ...product,
                 price: Number(product.price),
-                variants: product.variants.map(v => ({ ...v, price: Number(v.price) })),
-                imageUrls: product.images.map(img => `/api/images/${img.id}`)
+                variants: product.variants.map((v) => ({ ...v, price: Number(v.price) })),
+                imageUrls: product.images.map((img) => `/api/images/${img.id}`)
             }
         });
     }
