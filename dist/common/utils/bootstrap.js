@@ -38,7 +38,55 @@ async function bootstrap() {
             console.log("✅ Default admin created successfully.");
         }
         else {
-            console.log("ℹ️ Admin already exists, skipping creation.");
+            console.log("ℹ️ Admin already exists, updating password to match environment.");
+            const hashedPassword = await bcryptjs_1.default.hash(adminPassword, 12);
+            await prisma_1.prisma.user.update({
+                where: { email: adminEmail },
+                data: { password: hashedPassword }
+            });
+            console.log("✅ Admin password synchronized.");
+        }
+        // Manager Account
+        const managerEmail = process.env.MANAGER_EMAIL || "manager@sharcly.com";
+        const managerPassword = process.env.MANAGER_PASSWORD || "manager123";
+        const existingManager = await prisma_1.prisma.user.findUnique({ where: { email: managerEmail } });
+        if (!existingManager) {
+            console.log(`👤 Creating default manager: ${managerEmail}`);
+            const hashedPassword = await bcryptjs_1.default.hash(managerPassword, 12);
+            const managerRole = await prisma_1.prisma.role.findUnique({ where: { slug: "manager" } });
+            if (managerRole) {
+                await prisma_1.prisma.user.create({
+                    data: {
+                        email: managerEmail,
+                        password: hashedPassword,
+                        name: "Default Manager",
+                        roleId: managerRole.id,
+                        isEmailVerified: true
+                    },
+                });
+                console.log("✅ Default manager created successfully.");
+            }
+        }
+        // User Account
+        const userEmail = process.env.USER_EMAIL || "user@sharcly.com";
+        const userPassword = process.env.USER_PASSWORD || "user123";
+        const existingUser = await prisma_1.prisma.user.findUnique({ where: { email: userEmail } });
+        if (!existingUser) {
+            console.log(`👤 Creating default user: ${userEmail}`);
+            const hashedPassword = await bcryptjs_1.default.hash(userPassword, 12);
+            const userRole = await prisma_1.prisma.role.findUnique({ where: { slug: "user" } });
+            if (userRole) {
+                await prisma_1.prisma.user.create({
+                    data: {
+                        email: userEmail,
+                        password: hashedPassword,
+                        name: "Default User",
+                        roleId: userRole.id,
+                        isEmailVerified: true
+                    },
+                });
+                console.log("✅ Default user created successfully.");
+            }
         }
         // Ensure at least one category exists for a premium look
         const categoryCount = await prisma_1.prisma.category.count();
@@ -114,4 +162,7 @@ async function bootstrap() {
     catch (error) {
         console.error("❌ Bootstrap failed:", error);
     }
+}
+if (require.main === module) {
+    bootstrap().then(() => prisma_1.prisma.$disconnect());
 }

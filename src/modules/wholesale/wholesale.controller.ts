@@ -109,7 +109,7 @@ export class WholesaleController {
   static async updatePlan(req: Request, res: Response) {
     console.log(`PUT /api/wholesale/plans/${req.params.id} - Body:`, req.body);
     try {
-      const { id } = req.params;
+      const id = req.params.id as string;
       const { name, minOrder, discount, features, featured } = req.body;
 
       const plan = await prisma.pricingPlan.update({
@@ -134,7 +134,7 @@ export class WholesaleController {
   static async deletePlan(req: Request, res: Response) {
     console.log(`DELETE /api/wholesale/plans/${req.params.id}`);
     try {
-      const { id } = req.params;
+      const id = req.params.id as string;
       await prisma.pricingPlan.delete({
         where: { id },
       });

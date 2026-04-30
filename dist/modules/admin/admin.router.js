@@ -139,4 +139,8 @@ router.get("/permissions", admin_controller_1.getPermissions);
 router.post("/roles", admin_controller_1.createRole);
 router.patch("/roles/:id", admin_controller_1.updateRole);
 router.delete("/roles/:id", admin_controller_1.deleteRole);
+// API Integrations
+router.get("/integrations", admin_controller_1.getAllIntegrations);
+router.post("/integrations", admin_controller_1.upsertIntegration);
+router.delete("/integrations/:id", admin_controller_1.deleteIntegration);
 exports.default = router;

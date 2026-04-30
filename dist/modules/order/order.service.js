@@ -6,6 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.OrderService = void 0;
 const prisma_1 = require("../../common/lib/prisma");
 const client_1 = require("@prisma/client");
+const email_service_1 = require("../auth/email.service");
 const klaviyo_service_1 = require("../marketing/klaviyo.service");
 const seo_service_1 = require("../seo/seo.service");
 const crypto_1 = __importDefault(require("crypto"));
@@ -68,12 +69,29 @@ class OrderService {
         if (couponCode) {
             const coupon = await prisma_1.prisma.coupon.findUnique({ where: { code: couponCode } });
             if (coupon && coupon.expiryDate > new Date() && coupon.usedCount < coupon.usageLimit) {
-                couponDiscountAmount = Number(coupon.discount);
+                if (coupon.discountType === "PERCENTAGE") {
+                    couponDiscountAmount = (totalAmount * Number(coupon.discount)) / 100;
+                }
+                else {
+                    couponDiscountAmount = Number(coupon.discount);
+                }
                 couponId = coupon.id;
             }
         }
         // Apply coupon discount to total
         totalAmount = Math.max(0, totalAmount - couponDiscountAmount);
+        // Add Tax and Shipping from settings
+        const settings = await prisma_1.prisma.storeSettings.findFirst();
+        let taxAmount = 0;
+        let shippingCost = 0;
+        if (settings) {
+            const taxRate = Number(settings.taxRate) || 0;
+            taxAmount = (totalAmount * taxRate) / 100;
+            const shippingCharge = Number(settings.shippingCharge) || 0;
+            const freeShippingThreshold = Number(settings.freeShippingThreshold) || 0;
+            shippingCost = (freeShippingThreshold > 0 && totalAmount >= freeShippingThreshold) ? 0 : shippingCharge;
+        }
+        totalAmount += taxAmount + shippingCost;
         // Create order, update stock, and increment coupon usage all in ONE atomic transaction
         const order = await prisma_1.prisma.$transaction(async (tx) => {
             // If coupon is used, re-validate inside transaction to prevent race conditions
@@ -91,6 +109,8 @@ class OrderService {
                 data: {
                     userId: finalUserId,
                     totalAmount,
+                    taxAmount,
+                    shippingAmount: shippingCost,
                     address: shippingAddress,
                     shippingAddress,
                     billingAddress: billingAddress || shippingAddress,
@@ -141,26 +161,37 @@ class OrderService {
         catch (kErr) {
             console.warn("Klaviyo Order Tracking Failed:", kErr);
         }
+        // Send Email Confirmation
+        try {
+            await (0, email_service_1.sendOrderConfirmation)(email, order);
+        }
+        catch (eErr) {
+            console.warn("Email Confirmation Failed:", eErr);
+        }
         return order;
     }
     static async getMyOrders(userId) {
-        return await prisma_1.prisma.order.findMany({
+        const orders = await prisma_1.prisma.order.findMany({
             where: { userId },
             include: { items: { include: { product: true } } },
             orderBy: { createdAt: "desc" }
         });
+        const settings = await prisma_1.prisma.storeSettings.findFirst();
+        return orders.map((order) => this.applyLegacyFallback(order, settings));
     }
     static async getAllOrders() {
-        return await prisma_1.prisma.order.findMany({
+        const orders = await prisma_1.prisma.order.findMany({
             include: {
                 user: { select: { name: true, email: true } },
                 items: { include: { product: true } }
             },
             orderBy: { createdAt: "desc" }
         });
+        const settings = await prisma_1.prisma.storeSettings.findFirst();
+        return orders.map((order) => this.applyLegacyFallback(order, settings));
     }
     static async getOrderById(id) {
-        return await prisma_1.prisma.order.findUnique({
+        const order = await prisma_1.prisma.order.findUnique({
             where: { id },
             include: {
                 user: { select: { name: true, email: true } },
@@ -168,10 +199,33 @@ class OrderService {
                 coupon: true
             }
         });
+        if (!order)
+            return null;
+        const settings = await prisma_1.prisma.storeSettings.findFirst();
+        return this.applyLegacyFallback(order, settings);
+    }
+    static applyLegacyFallback(order, settings) {
+        if (!order)
+            return order;
+        const itemsSubtotal = order.items.reduce((acc, item) => acc + (Number(item.price) * item.quantity), 0);
+        const total = Number(order.totalAmount);
+        const recordedTax = Number(order.taxAmount || 0);
+        const recordedShipping = Number(order.shippingAmount || 0);
+        if (recordedTax === 0 && recordedShipping === 0 && total > itemsSubtotal && settings) {
+            const taxRate = Number(settings.taxRate) || 0;
+            const inferredTax = (itemsSubtotal * taxRate) / 100;
+            const inferredShipping = Math.max(0, total - itemsSubtotal - inferredTax);
+            return {
+                ...order,
+                taxAmount: inferredTax,
+                shippingAmount: inferredShipping
+            };
+        }
+        return order;
     }
     static async updateOrderStatus(id, updateData) {
         const { status, trackingNumber, carrier, estimatedDelivery, notes } = updateData;
-        return await prisma_1.prisma.order.update({
+        const updatedOrder = await prisma_1.prisma.order.update({
             where: { id },
             data: {
                 status: status,
@@ -179,8 +233,21 @@ class OrderService {
                 carrier: carrier || undefined,
                 estimatedDelivery: estimatedDelivery ? new Date(estimatedDelivery) : undefined,
                 notes: notes || undefined
+            },
+            include: {
+                user: { select: { email: true, name: true } },
+                items: { include: { product: true } }
             }
         });
+        // Send Status Update Email
+        try {
+            const { sendOrderStatusUpdate } = require("../auth/email.service");
+            await sendOrderStatusUpdate(updatedOrder.user.email, updatedOrder);
+        }
+        catch (eErr) {
+            console.warn("Status Update Email Failed:", eErr);
+        }
+        return updatedOrder;
     }
 }
 exports.OrderService = OrderService;
