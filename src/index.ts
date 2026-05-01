@@ -15,172 +15,147 @@ import swaggerOptions from "./common/config/swagger.config";
 
 import apiRoutes from "./routes";
 import { bootstrap } from "./common/utils/bootstrap";
+import imageRouter from "./modules/image/image.router";
+import { BlogWorker } from "./modules/blog/blog.worker";
 
 const app = express();
 const port = process.env.PORT || 5000;
 
-// ─── Core CORS Middleware (Manual for maximum reliability on Vercel) ──────────
+/* ─────────────────────────────────────────────
+   ✅ CORS FIX (FINAL PRODUCTION VERSION)
+──────────────────────────────────────────── */
+
 const allowedOrigins = [
-  process.env.FRONTEND_URL,
   "http://localhost:3000",
-  "http://207.2.123.86:3000",
   "https://sharcly.io",
-  "https://sharcly-2-0.vercel.app"
-].filter(Boolean).map(o => o?.replace(/\/$/, "")) as string[];
+  "https://sharcly-2-0.vercel.app",
+  process.env.FRONTEND_URL
+].filter(Boolean) as string[];
 
-app.use((req, res, next) => {
-  const origin = req.headers.origin;
-  if (origin) {
-    const normalizedOrigin = origin.replace(/\/$/, "").toLowerCase();
-    const isVercelPreview = normalizedOrigin.endsWith(".vercel.app") && !normalizedOrigin.includes("sharcly.io");
-    const isAllowed = allowedOrigins.some(o => o.toLowerCase() === normalizedOrigin);
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      // allow requests with no origin (mobile apps / curl / postman)
+      if (!origin) return callback(null, true);
 
-    if (isAllowed || isVercelPreview) {
-      // Only set if not already set by vercel.json to avoid duplicates
-      if (!res.getHeader("Access-Control-Allow-Origin")) {
-        res.setHeader("Access-Control-Allow-Origin", origin);
+      const normalizedOrigin = origin.replace(/\/$/, "");
+
+      if (allowedOrigins.includes(normalizedOrigin)) {
+        return callback(null, true);
       }
-      res.setHeader("Access-Control-Allow-Credentials", "true");
-    } else {
-      console.warn(`[CORS REJECTED] Origin: "${origin}"`);
-    }
-  }
 
-  // Set other headers if not present
-  if (!res.getHeader("Access-Control-Allow-Methods")) {
-    res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS");
-  }
-  if (!res.getHeader("Access-Control-Allow-Headers")) {
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, Accept, X-CSRF-Token, X-Api-Version, Accept-Version, Origin");
-  }
-  res.setHeader("Access-Control-Max-Age", "86400");
+      // allow all vercel preview domains
+      if (normalizedOrigin.endsWith(".vercel.app")) {
+        return callback(null, true);
+      }
 
-  if (req.method === "OPTIONS") {
-    return res.status(204).end();
-  }
-  next();
-});
-
-// ─── Other Global Middlewares ─────────────────────────────────────────────────
-app.use(compression());
-app.use(helmet({
-  crossOriginResourcePolicy: false,
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
-      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
-      imgSrc: ["'self'", "data:", "https:", "blob:"],
-      connectSrc: ["'self'", "http://207.2.123.86:8181", "http://207.2.123.86:3000", "https:"],
-      fontSrc: ["'self'", "https://fonts.gstatic.com"],
-      objectSrc: ["'none'"],
-      frameAncestors: ["'none'"],
+      return callback(new Error("CORS Not Allowed"));
     },
-  },
-}));
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+      "X-Requested-With",
+      "Accept"
+    ]
+  })
+);
+
+// IMPORTANT for preflight requests
+app.options("*", cors());
+
+/* ─────────────────────────────────────────────
+   Middlewares
+──────────────────────────────────────────── */
+
+app.use(compression());
+
+app.use(
+  helmet({
+    crossOriginResourcePolicy: false
+  })
+);
 
 app.use(morgan(process.env.NODE_ENV === "production" ? "combined" : "dev"));
 app.use(cookieParser());
+
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
-// ─── Rate Limiting ────────────────────────────────────────────────────────────
-const globalLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 500,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { message: "Too many requests, please try again later." },
+/* ─────────────────────────────────────────────
+   Rate Limiting
+──────────────────────────────────────────── */
+
+app.use(
+  "/api",
+  rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 500
+  })
+);
+
+/* ─────────────────────────────────────────────
+   Health Check
+──────────────────────────────────────────── */
+
+app.get("/api/health", (req: Request, res: Response) => {
+  res.json({
+    status: "ok",
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV
+  });
 });
 
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 15,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { message: "Too many authentication attempts, please try again in 15 minutes." },
-});
-
-app.use("/api", globalLimiter);
-app.use("/api/auth/login", authLimiter);
-app.use("/api/auth/register", authLimiter);
-app.use("/api/auth/refresh-token", authLimiter);
-app.use("/api/auth/verify-email", authLimiter);
-
-const searchLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: 30,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { message: "Too many search requests, please slow down." },
-});
-app.use("/api/search", searchLimiter);
-
-// ─── Health & Docs ────────────────────────────────────────────────────────────
-app.get("/api/health", (req, res) => {
-  res.json({ status: "ok", timestamp: new Date().toISOString(), environment: process.env.NODE_ENV });
-});
+/* ─────────────────────────────────────────────
+   Swagger
+──────────────────────────────────────────── */
 
 const swaggerSpec = swaggerJsdoc(swaggerOptions);
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
-// ─── Routes ──────────────────────────────────────────────────────────────────
+/* ─────────────────────────────────────────────
+   Routes
+──────────────────────────────────────────── */
+
 app.use("/api", apiRoutes);
-import imageRouter from "./modules/image/image.router";
 app.use("/images", imageRouter);
 
-// ─── Global Error Handler ─────────────────────────────────────────────────────
+/* ─────────────────────────────────────────────
+   Error Handler
+──────────────────────────────────────────── */
+
 app.use((err: any, req: Request, res: Response, next: any) => {
-  console.error("[ERROR]", err.stack);
-  const isProduction = process.env.NODE_ENV === "production";
+  console.error("[ERROR]", err);
+
   res.status(err.status || 500).json({
     success: false,
-    message: isProduction ? "An internal error occurred" : (err.message || "Internal Server Error"),
+    message:
+      process.env.NODE_ENV === "production"
+        ? "Internal Server Error"
+        : err.message
   });
 });
 
-import { BlogWorker } from "./modules/blog/blog.worker";
+/* ─────────────────────────────────────────────
+   Server Start (ONLY local / non-vercel)
+──────────────────────────────────────────── */
 
-// ─── Server Start ─────────────────────────────────────────────────────────────
 async function startServer() {
   try {
     await bootstrap();
     BlogWorker.init();
 
-    const server = app.listen(port, () => {
-      console.log(`⚡️[server]: Server is running at http://localhost:${port}`);
+    app.listen(port, () => {
+      console.log(`⚡ Server running on http://localhost:${port}`);
     });
-
-    server.on("error", (err: any) => {
-      if (err.code === "EADDRINUSE") {
-        console.error(`❌ Port ${port} is already in use.`);
-        process.exit(1);
-      } else {
-        console.error("❌ Server error:", err);
-      }
-    });
-
-    const gracefullyShutdown = async (signal: string) => {
-      console.log(`\nStopping server due to ${signal}...`);
-      server.close(async () => {
-        try {
-          await prisma.$disconnect();
-          process.exit(0);
-        } catch (err) {
-          process.exit(1);
-        }
-      });
-    };
-
-    process.on("SIGINT", () => gracefullyShutdown("SIGINT"));
-    process.on("SIGTERM", () => gracefullyShutdown("SIGTERM"));
   } catch (error) {
     console.error("❌ Failed to start server:", error);
     process.exit(1);
   }
 }
 
-if (process.env.NODE_ENV !== "production" || !process.env.VERCEL) {
+if (!process.env.VERCEL) {
   startServer();
 }
 
