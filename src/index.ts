@@ -56,21 +56,25 @@ const allowedOrigins = [
 
 const corsOptions: cors.CorsOptions = {
   origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
     
     const normalizedOrigin = origin.replace(/\/$/, "");
     const isAllowed = allowedOrigins.includes(normalizedOrigin);
-    const isVercelPreview = normalizedOrigin.endsWith(".vercel.app") && 
-                           (normalizedOrigin.includes("sharcly-2-0") || normalizedOrigin.includes("james-projects"));
+    
+    // Broaden Vercel subdomain matching for reliability
+    const isVercel = normalizedOrigin.endsWith(".vercel.app");
 
-    if (isAllowed || isVercelPreview) {
+    if (isAllowed || isVercel) {
       callback(null, true);
     } else {
-      console.warn(`[CORS] Origin ${origin} not allowed`);
-      callback(new Error("Not allowed by CORS"));
+      console.warn(`[CORS] Origin ${origin} blocked`);
+      // Return null, false instead of an Error to avoid 500 crashes
+      callback(null, false);
     }
   },
   credentials: true,
+  maxAge: 86400, // Cache preflight response for 24 hours
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
   allowedHeaders: [
     "Content-Type", 
