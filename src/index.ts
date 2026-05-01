@@ -63,7 +63,10 @@ app.use(cors({
   origin: [
     process.env.FRONTEND_URL || "http://localhost:3000",
     "http://localhost:3000",
-    "http://207.2.123.86:3000"
+    "http://207.2.123.86:3000",
+    "https://sharcly-2-0-git-main-james-projects-69c5531f.vercel.app",
+    "https://sharcly.io",
+    "https://sharcly-2-0.vercel.app"
   ],
   credentials: true, // Required for httpOnly cookies
 }));
