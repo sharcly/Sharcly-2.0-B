@@ -31,13 +31,15 @@ const allowedOrigins = [
 app.use((req, res, next) => {
   const origin = req.headers.origin;
   if (origin) {
-    const normalizedOrigin = origin.replace(/\/$/, "");
-    const isAllowed = allowedOrigins.includes(normalizedOrigin);
+    const normalizedOrigin = origin.replace(/\/$/, "").toLowerCase();
+    const isAllowed = allowedOrigins.some(o => o.toLowerCase() === normalizedOrigin);
     const isVercel = normalizedOrigin.endsWith(".vercel.app");
 
     if (isAllowed || isVercel) {
       res.setHeader("Access-Control-Allow-Origin", origin);
       res.setHeader("Access-Control-Allow-Credentials", "true");
+    } else {
+      console.warn(`[CORS REJECTED] Origin: "${origin}"`);
     }
   }
 
