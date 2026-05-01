@@ -78,8 +78,14 @@ const corsOptions: cors.CorsOptions = {
 // Apply CORS to all routes
 app.use(cors(corsOptions));
 
-// Explicitly handle all pre-flight OPTIONS requests
-app.options("*", cors(corsOptions));
+// Ensure all pre-flight OPTIONS requests are terminated early with a 200 status
+// This is a cleaner approach for Express 5 and Vercel compatibility
+app.use((req, res, next) => {
+  if (req.method === "OPTIONS") {
+    return res.status(200).end();
+  }
+  next();
+});
 
 /* ─────────────────────────────────────────────
    Middlewares
