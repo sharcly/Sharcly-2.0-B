@@ -32,19 +32,27 @@ app.use((req, res, next) => {
   const origin = req.headers.origin;
   if (origin) {
     const normalizedOrigin = origin.replace(/\/$/, "").toLowerCase();
+    const isVercelPreview = normalizedOrigin.endsWith(".vercel.app") && !normalizedOrigin.includes("sharcly.io");
     const isAllowed = allowedOrigins.some(o => o.toLowerCase() === normalizedOrigin);
-    const isVercel = normalizedOrigin.endsWith(".vercel.app");
 
-    if (isAllowed || isVercel) {
-      res.setHeader("Access-Control-Allow-Origin", origin);
+    if (isAllowed || isVercelPreview) {
+      // Only set if not already set by vercel.json to avoid duplicates
+      if (!res.getHeader("Access-Control-Allow-Origin")) {
+        res.setHeader("Access-Control-Allow-Origin", origin);
+      }
       res.setHeader("Access-Control-Allow-Credentials", "true");
     } else {
       console.warn(`[CORS REJECTED] Origin: "${origin}"`);
     }
   }
 
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, Accept, X-CSRF-Token, X-Api-Version, Accept-Version, Origin");
+  // Set other headers if not present
+  if (!res.getHeader("Access-Control-Allow-Methods")) {
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS");
+  }
+  if (!res.getHeader("Access-Control-Allow-Headers")) {
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, Accept, X-CSRF-Token, X-Api-Version, Accept-Version, Origin");
+  }
   res.setHeader("Access-Control-Max-Age", "86400");
 
   if (req.method === "OPTIONS") {
