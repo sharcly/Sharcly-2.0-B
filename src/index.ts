@@ -19,7 +19,7 @@ import { bootstrap } from "./common/utils/bootstrap";
 const app = express();
 const port = process.env.PORT || 5000;
 
-// ─── Core CORS Middleware (MUST BE FIRST) ────────────────────────────────────
+// ─── Core CORS Middleware (Manual for maximum reliability on Vercel) ──────────
 const allowedOrigins = [
   process.env.FRONTEND_URL,
   "http://localhost:3000",
@@ -28,37 +28,28 @@ const allowedOrigins = [
   "https://sharcly-2-0.vercel.app"
 ].filter(Boolean).map(o => o?.replace(/\/$/, "")) as string[];
 
-const corsOptions: cors.CorsOptions = {
-  origin: (origin, callback) => {
-    if (!origin) return callback(null, true);
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (origin) {
     const normalizedOrigin = origin.replace(/\/$/, "");
     const isAllowed = allowedOrigins.includes(normalizedOrigin);
     const isVercel = normalizedOrigin.endsWith(".vercel.app");
 
     if (isAllowed || isVercel) {
-      callback(null, true);
-    } else {
-      console.warn(`[CORS] Origin ${origin} blocked`);
-      callback(null, false);
+      res.setHeader("Access-Control-Allow-Origin", origin);
+      res.setHeader("Access-Control-Allow-Credentials", "true");
     }
-  },
-  credentials: true,
-  maxAge: 86400,
-  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-  allowedHeaders: [
-    "Content-Type", 
-    "Authorization", 
-    "X-Requested-With", 
-    "Accept", 
-    "X-CSRF-Token", 
-    "X-Api-Version", 
-    "Accept-Version",
-    "Origin"
-  ],
-  exposedHeaders: ["set-cookie"]
-};
+  }
 
-app.use(cors(corsOptions));
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, Accept, X-CSRF-Token, X-Api-Version, Accept-Version, Origin");
+  res.setHeader("Access-Control-Max-Age", "86400");
+
+  if (req.method === "OPTIONS") {
+    return res.status(204).end();
+  }
+  next();
+});
 
 // ─── Other Global Middlewares ─────────────────────────────────────────────────
 app.use(compression());

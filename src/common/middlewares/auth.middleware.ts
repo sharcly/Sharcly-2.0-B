@@ -42,6 +42,7 @@ export const authenticate = async (
   try {
     const token = extractToken(req);
     if (!token) {
+      console.warn(`[AUTH] 401: Token missing for ${req.method} ${req.originalUrl} from ${req.headers.origin || 'no origin'}`);
       return res.status(401).json({ message: "Authentication required" });
     }
 
