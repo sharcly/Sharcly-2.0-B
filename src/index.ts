@@ -32,38 +32,36 @@ const allowedOrigins = [
   process.env.FRONTEND_URL
 ].filter(Boolean) as string[];
 
-app.use(
-  cors({
-    origin: (origin, callback) => {
-      // allow requests with no origin (mobile apps / curl / postman)
-      if (!origin) return callback(null, true);
+const corsOptions: cors.CorsOptions = {
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true);
+    const normalizedOrigin = origin.replace(/\/$/, "").toLowerCase();
+    const isAllowed = allowedOrigins.some(o => o?.toLowerCase().replace(/\/$/, "") === normalizedOrigin);
+    const isVercel = normalizedOrigin.endsWith(".vercel.app");
 
-      const normalizedOrigin = origin.replace(/\/$/, "");
+    if (isAllowed || isVercel) {
+      callback(null, true);
+    } else {
+      callback(null, false);
+    }
+  },
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+  allowedHeaders: [
+    "Content-Type",
+    "Authorization",
+    "X-Requested-With",
+    "Accept",
+    "X-CSRF-Token",
+    "X-Api-Version"
+  ],
+  maxAge: 86400
+};
 
-      if (allowedOrigins.includes(normalizedOrigin)) {
-        return callback(null, true);
-      }
+app.use(cors(corsOptions));
 
-      // allow all vercel preview domains
-      if (normalizedOrigin.endsWith(".vercel.app")) {
-        return callback(null, true);
-      }
-
-      return callback(new Error("CORS Not Allowed"));
-    },
-    credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-    allowedHeaders: [
-      "Content-Type",
-      "Authorization",
-      "X-Requested-With",
-      "Accept"
-    ]
-  })
-);
-
-// IMPORTANT for preflight requests
-app.options("*", cors());
+// ✅ Fix for Express 5 wildcard crash
+app.options("/:path*", cors(corsOptions));
 
 /* ─────────────────────────────────────────────
    Middlewares
