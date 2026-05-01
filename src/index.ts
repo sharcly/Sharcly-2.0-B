@@ -19,33 +19,7 @@ import { bootstrap } from "./common/utils/bootstrap";
 const app = express();
 const port = process.env.PORT || 5000;
 
-// Swagger Documentation
-const swaggerSpec = swaggerJsdoc(swaggerOptions);
-app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
-
-// ─── Rate Limiting ────────────────────────────────────────────────────────────
-const globalLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 500, // general API limit
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { message: "Too many requests, please try again later." },
-});
-
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 15, // strict limit on login/register
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { message: "Too many authentication attempts, please try again in 15 minutes." },
-});
-
-// ─── Health Check ─────────────────────────────────────────────────────────────
-app.get("/api/health", (req, res) => {
-  res.json({ status: "ok", timestamp: new Date().toISOString(), environment: process.env.NODE_ENV });
-});
-
-// ─── Core Middleware ──────────────────────────────────────────────────────────
+// ─── Core CORS Middleware (MUST BE FIRST) ────────────────────────────────────
 const allowedOrigins = [
   process.env.FRONTEND_URL,
   "http://localhost:3000",
@@ -56,25 +30,20 @@ const allowedOrigins = [
 
 const corsOptions: cors.CorsOptions = {
   origin: (origin, callback) => {
-    // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
-    
     const normalizedOrigin = origin.replace(/\/$/, "");
     const isAllowed = allowedOrigins.includes(normalizedOrigin);
-    
-    // Broaden Vercel subdomain matching for reliability
     const isVercel = normalizedOrigin.endsWith(".vercel.app");
 
     if (isAllowed || isVercel) {
       callback(null, true);
     } else {
       console.warn(`[CORS] Origin ${origin} blocked`);
-      // Return null, false instead of an Error to avoid 500 crashes
       callback(null, false);
     }
   },
   credentials: true,
-  maxAge: 86400, // Cache preflight response for 24 hours
+  maxAge: 86400,
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
   allowedHeaders: [
     "Content-Type", 
@@ -83,14 +52,15 @@ const corsOptions: cors.CorsOptions = {
     "Accept", 
     "X-CSRF-Token", 
     "X-Api-Version", 
-    "X-App-Version",
-    "Accept-Version"
+    "Accept-Version",
+    "Origin"
   ],
   exposedHeaders: ["set-cookie"]
 };
 
 app.use(cors(corsOptions));
 
+// ─── Other Global Middlewares ─────────────────────────────────────────────────
 app.use(compression());
 app.use(helmet({
   crossOriginResourcePolicy: false,
@@ -114,6 +84,22 @@ app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
 // ─── Rate Limiting ────────────────────────────────────────────────────────────
+const globalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 500,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: "Too many requests, please try again later." },
+});
+
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 15,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: "Too many authentication attempts, please try again in 15 minutes." },
+});
+
 app.use("/api", globalLimiter);
 app.use("/api/auth/login", authLimiter);
 app.use("/api/auth/register", authLimiter);
@@ -128,6 +114,14 @@ const searchLimiter = rateLimit({
   message: { message: "Too many search requests, please slow down." },
 });
 app.use("/api/search", searchLimiter);
+
+// ─── Health & Docs ────────────────────────────────────────────────────────────
+app.get("/api/health", (req, res) => {
+  res.json({ status: "ok", timestamp: new Date().toISOString(), environment: process.env.NODE_ENV });
+});
+
+const swaggerSpec = swaggerJsdoc(swaggerOptions);
+app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 // ─── Routes ──────────────────────────────────────────────────────────────────
 app.use("/api", apiRoutes);
@@ -185,10 +179,8 @@ async function startServer() {
   }
 }
 
-// Only start the server if not running on Vercel
 if (process.env.NODE_ENV !== "production" || !process.env.VERCEL) {
   startServer();
 }
 
 export default app;
-
