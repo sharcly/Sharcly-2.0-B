@@ -40,6 +40,11 @@ const authLimiter = rateLimit({
   message: { message: "Too many authentication attempts, please try again in 15 minutes." },
 });
 
+// ─── Health Check ─────────────────────────────────────────────────────────────
+app.get("/api/health", (req, res) => {
+  res.json({ status: "ok", timestamp: new Date().toISOString(), environment: process.env.NODE_ENV });
+});
+
 // ─── Core Middleware ──────────────────────────────────────────────────────────
 const allowedOrigins = [
   process.env.FRONTEND_URL,
@@ -47,17 +52,16 @@ const allowedOrigins = [
   "http://207.2.123.86:3000",
   "https://sharcly.io",
   "https://sharcly-2-0.vercel.app"
-].filter(Boolean) as string[];
+].filter(Boolean).map(o => o?.replace(/\/$/, "")) as string[];
 
-// CORS should be one of the first middlewares to handle preflight requests
-app.use(cors({
+const corsOptions: cors.CorsOptions = {
   origin: (origin, callback) => {
-    // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
     
-    const isAllowed = allowedOrigins.some(o => o === origin || o === `${origin}/`);
-    const isVercelPreview = origin.endsWith(".vercel.app") && 
-                           (origin.includes("sharcly-2-0") || origin.includes("james-projects"));
+    const normalizedOrigin = origin.replace(/\/$/, "");
+    const isAllowed = allowedOrigins.includes(normalizedOrigin);
+    const isVercelPreview = normalizedOrigin.endsWith(".vercel.app") && 
+                           (normalizedOrigin.includes("sharcly-2-0") || normalizedOrigin.includes("james-projects"));
 
     if (isAllowed || isVercelPreview) {
       callback(null, true);
@@ -69,13 +73,12 @@ app.use(cors({
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept"],
-}));
+};
 
-// Explicitly handle preflight requests for all routes
-app.options("*", cors() as any);
+app.use(cors(corsOptions));
+app.options("*", cors(corsOptions) as any);
 
 app.use(compression());
-
 app.use(helmet({
   crossOriginResourcePolicy: false,
   contentSecurityPolicy: {
@@ -92,30 +95,20 @@ app.use(helmet({
   },
 }));
 
-
-
-// Use 'combined' in production for structured logs, 'dev' for local
 app.use(morgan(process.env.NODE_ENV === "production" ? "combined" : "dev"));
-
-// Parse cookies (needed for httpOnly token cookies)
 app.use(cookieParser());
-
-// Body parsing with size limits to prevent DoS
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
-// Apply global rate limit
+// ─── Rate Limiting ────────────────────────────────────────────────────────────
 app.use("/api", globalLimiter);
-
-// Apply strict rate limit on auth endpoints
 app.use("/api/auth/login", authLimiter);
 app.use("/api/auth/register", authLimiter);
 app.use("/api/auth/refresh-token", authLimiter);
 app.use("/api/auth/verify-email", authLimiter);
 
-// Search rate limit — prevent DoS via repeated expensive queries
 const searchLimiter = rateLimit({
-  windowMs: 60 * 1000, // 1 minute
+  windowMs: 60 * 1000,
   max: 30,
   standardHeaders: true,
   legacyHeaders: false,
@@ -125,16 +118,12 @@ app.use("/api/search", searchLimiter);
 
 // ─── Routes ──────────────────────────────────────────────────────────────────
 app.use("/api", apiRoutes);
-
 import imageRouter from "./modules/image/image.router";
 app.use("/images", imageRouter);
 
 // ─── Global Error Handler ─────────────────────────────────────────────────────
 app.use((err: any, req: Request, res: Response, next: any) => {
-  // Log full error internally
   console.error("[ERROR]", err.stack);
-
-  // Never expose internal error details in production
   const isProduction = process.env.NODE_ENV === "production";
   res.status(err.status || 500).json({
     success: false,
@@ -166,34 +155,27 @@ async function startServer() {
     const gracefullyShutdown = async (signal: string) => {
       console.log(`\nStopping server due to ${signal}...`);
       server.close(async () => {
-        console.log("HTTP server closed.");
         try {
           await prisma.$disconnect();
-          console.log("Database connection closed.");
           process.exit(0);
         } catch (err) {
-          console.error("Error during shutdown:", err);
           process.exit(1);
         }
       });
-
-      setTimeout(() => {
-        console.error("Could not close connections in time, forcefully shutting down");
-        process.exit(1);
-      }, 10000);
     };
 
     process.on("SIGINT", () => gracefullyShutdown("SIGINT"));
     process.on("SIGTERM", () => gracefullyShutdown("SIGTERM"));
-
   } catch (error) {
     console.error("❌ Failed to start server:", error);
     process.exit(1);
   }
 }
 
+// Only start the server if not running on Vercel
 if (process.env.NODE_ENV !== "production" || !process.env.VERCEL) {
   startServer();
 }
 
 export default app;
+
