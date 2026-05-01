@@ -180,7 +180,7 @@ export const createProduct = async (req: Request, res: Response) => {
         name,
         subtitle,
         slug: finalSlug,
-        sku,
+        sku: sku || null,
         description,
         status: status || "DRAFT",
         price: parseFloat(price as string || "0"),
@@ -218,7 +218,7 @@ export const createProduct = async (req: Request, res: Response) => {
         variants: {
           create: variantData.map((v: any, idx: number) => ({
             title: v.title,
-            sku: v.sku,
+            sku: v.sku || null,
             price: parseFloat(v.price || v.prices?.[0]?.amount || v.price || 0),
             inventoryQuantity: parseInt(v.inventoryQuantity || v.stock || 0),
             manageInventory: v.manageInventory === "true" || v.manageInventory === true || v.manageInventory === undefined,
@@ -333,7 +333,7 @@ export const updateProduct = async (req: Request, res: Response) => {
         name,
         subtitle,
         slug,
-        sku,
+        sku: sku || null,
         description,
         status,
         price: price !== undefined ? parseFloat(price as string) : undefined,
@@ -373,7 +373,7 @@ export const updateProduct = async (req: Request, res: Response) => {
           deleteMany: {},
           create: variantData.map((v: any) => ({
             title: v.title,
-            sku: v.sku,
+            sku: v.sku || null,
             price: parseFloat(v.price || 0),
             inventoryQuantity: parseInt(v.inventoryQuantity || v.stock || 0),
             manageInventory: v.manageInventory === "true" || v.manageInventory === true || v.manageInventory === undefined,
