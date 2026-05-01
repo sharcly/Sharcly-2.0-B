@@ -86,7 +86,6 @@ const corsOptions: cors.CorsOptions = {
 };
 
 app.use(cors(corsOptions));
-app.options("(.*)", cors(corsOptions) as any);
 
 app.use(compression());
 app.use(helmet({
