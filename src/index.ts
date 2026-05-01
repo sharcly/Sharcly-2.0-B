@@ -129,6 +129,29 @@ app.get("/api/health", (req: Request, res: Response) => {
   });
 });
 
+app.get("/api/db-check", async (req: Request, res: Response) => {
+  try {
+    const userCount = await prisma.user.count();
+    const adminUser = await prisma.user.findUnique({
+      where: { email: "admin@sharcly.com" },
+      select: { email: true, id: true }
+    });
+    
+    res.json({
+      success: true,
+      userCount,
+      adminExists: !!adminUser,
+      databaseUrlStart: process.env.POSTGRES_URL?.substring(0, 30) + "...",
+      nodeEnv: process.env.NODE_ENV
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
 /* ─────────────────────────────────────────────
    Swagger
 ──────────────────────────────────────────── */
