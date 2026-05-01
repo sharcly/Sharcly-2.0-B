@@ -22,11 +22,12 @@ const app = express();
 const port = process.env.PORT || 5000;
 
 /* ─────────────────────────────────────────────
-   ✅ CORS FIX (FINAL PRODUCTION VERSION)
+   ✅ CORS CONFIGURATION (Dynamic & Robust)
 ──────────────────────────────────────────── */
 
 const allowedOrigins = [
   "http://localhost:3000",
+  "http://localhost:5173", // Common Vite port
   "https://sharcly.io",
   "https://sharcly-2-0.vercel.app",
   process.env.FRONTEND_URL
@@ -34,14 +35,24 @@ const allowedOrigins = [
 
 const corsOptions: cors.CorsOptions = {
   origin: (origin, callback) => {
+    // 1. Allow non-browser requests (like mobile apps or server-to-server)
     if (!origin) return callback(null, true);
+
     const normalizedOrigin = origin.replace(/\/$/, "").toLowerCase();
-    const isAllowed = allowedOrigins.some(o => o?.toLowerCase().replace(/\/$/, "") === normalizedOrigin);
+
+    // 2. Check against explicit allowed list
+    const isAllowed = allowedOrigins.some(o => {
+      if (!o) return false;
+      return o.toLowerCase().replace(/\/$/, "") === normalizedOrigin;
+    });
+
+    // 3. Allow all Vercel subdomains (previews, branches, etc.)
     const isVercel = normalizedOrigin.endsWith(".vercel.app");
 
     if (isAllowed || isVercel) {
       callback(null, true);
     } else {
+      // For security, reject unknown origins
       callback(null, false);
     }
   },
@@ -53,15 +64,22 @@ const corsOptions: cors.CorsOptions = {
     "X-Requested-With",
     "Accept",
     "X-CSRF-Token",
-    "X-Api-Version"
+    "X-Api-Version",
+    "sentry-trace",
+    "baggage",
+    "x-vercel-id",
+    "x-vercel-cache"
   ],
-  maxAge: 86400
+  exposedHeaders: ["set-cookie"],
+  optionsSuccessStatus: 200, // For legacy browser support (IE11, various mobile browsers)
+  maxAge: 86400 // Cache preflight for 24 hours
 };
 
+// Apply CORS to all routes
 app.use(cors(corsOptions));
 
-// ✅ Fix for Express 5 wildcard crash
-app.options("/:path*", cors(corsOptions));
+// Explicitly handle all pre-flight OPTIONS requests
+app.options("*", cors(corsOptions));
 
 /* ─────────────────────────────────────────────
    Middlewares
