@@ -10,8 +10,8 @@ const COOKIE_OPTIONS = {
 
 export const register = async (req: Request, res: Response) => {
   try {
-    const { email, password, name } = req.body;
-    const result = await AuthService.register({ email, password, name });
+    const { email, password, name, otp } = req.body;
+    const result = await AuthService.register({ email, password, name, otp });
 
     // Set httpOnly cookies
     res.cookie("access_token", result.tokens.accessToken, {
