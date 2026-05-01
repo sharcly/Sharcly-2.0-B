@@ -41,6 +41,39 @@ const authLimiter = rateLimit({
 });
 
 // ─── Core Middleware ──────────────────────────────────────────────────────────
+const allowedOrigins = [
+  process.env.FRONTEND_URL,
+  "http://localhost:3000",
+  "http://207.2.123.86:3000",
+  "https://sharcly.io",
+  "https://sharcly-2-0.vercel.app"
+].filter(Boolean) as string[];
+
+// CORS should be one of the first middlewares to handle preflight requests
+app.use(cors({
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    const isAllowed = allowedOrigins.some(o => o === origin || o === `${origin}/`);
+    const isVercelPreview = origin.endsWith(".vercel.app") && 
+                           (origin.includes("sharcly-2-0") || origin.includes("james-projects"));
+
+    if (isAllowed || isVercelPreview) {
+      callback(null, true);
+    } else {
+      console.warn(`[CORS] Origin ${origin} not allowed`);
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept"],
+}));
+
+// Explicitly handle preflight requests for all routes
+app.options("*", cors() as any);
+
 app.use(compression());
 
 app.use(helmet({
@@ -59,17 +92,7 @@ app.use(helmet({
   },
 }));
 
-app.use(cors({
-  origin: [
-    process.env.FRONTEND_URL || "http://localhost:3000",
-    "http://localhost:3000",
-    "http://207.2.123.86:3000",
-    "https://sharcly-2-0-git-main-james-projects-69c5531f.vercel.app",
-    "https://sharcly.io",
-    "https://sharcly-2-0.vercel.app"
-  ],
-  credentials: true, // Required for httpOnly cookies
-}));
+
 
 // Use 'combined' in production for structured logs, 'dev' for local
 app.use(morgan(process.env.NODE_ENV === "production" ? "combined" : "dev"));
