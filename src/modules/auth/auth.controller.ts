@@ -3,8 +3,8 @@ import { AuthService } from "./auth.service";
 
 const COOKIE_OPTIONS = {
   httpOnly: true,
-  secure: process.env.NODE_ENV === "production",
-  sameSite: "lax" as const,
+  secure: true, // Required for SameSite=None
+  sameSite: "none" as const, // Support cross-domain cookies
   path: "/",
 };
 
