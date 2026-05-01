@@ -6,7 +6,7 @@ import dotenv from "dotenv";
 dotenv.config();
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 
-const connectionString = process.env.DATABASE_URL;
+const connectionString = process.env.POSTGRES_URL || process.env.DATABASE_URL;
 
 const globalForPrisma = global as unknown as { prisma: PrismaClient };
 
