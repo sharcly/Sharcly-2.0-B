@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { login, register, getProfile, getMe, verifyEmail, refreshTokens, logout, changePassword, sendOtp, forgotPassword, resetPassword } from "./auth.controller";
+import { login, register, getProfile, getMe, verifyEmail, refreshTokens, logout, changePassword, sendOtp, forgotPassword, resetPassword, deactivateAccount } from "./auth.controller";
 import { authenticate } from "../../common/middlewares/auth.middleware";
 import { validate, LoginSchema, RegisterSchema, ChangePasswordSchema, ForgotPasswordSchema, ResetPasswordSchema } from "../../common/middlewares/validate.middleware";
 import rateLimit from "express-rate-limit";
