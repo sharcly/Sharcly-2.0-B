@@ -176,3 +176,17 @@ export const resetPassword = async (req: Request, res: Response) => {
     res.status(400).json({ message: error.message || "Failed to reset password" });
   }
 };
+
+export const deactivateAccount = async (req: any, res: Response) => {
+  try {
+    await AuthService.deactivateAccount(req.user.id);
+    
+    // Clear cookies
+    res.clearCookie("access_token", { ...COOKIE_OPTIONS });
+    res.clearCookie("refresh_token", { ...COOKIE_OPTIONS });
+
+    res.status(200).json({ success: true, message: "Account deactivated successfully" });
+  } catch (error: any) {
+    res.status(500).json({ message: error.message || "Failed to deactivate account" });
+  }
+};
