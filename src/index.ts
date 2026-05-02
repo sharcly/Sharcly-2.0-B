@@ -109,6 +109,8 @@ app.use(express.urlencoded({ extended: true, limit: "10mb" }));
    Rate Limiting
 ──────────────────────────────────────────── */
 
+import { csrfProtection } from "./common/middlewares/csrf.middleware";
+
 app.use(
   "/api",
   rateLimit({
@@ -116,6 +118,9 @@ app.use(
     max: 500
   })
 );
+
+// Global CSRF Protection
+app.use("/api", csrfProtection);
 
 /* ─────────────────────────────────────────────
    Health Check
