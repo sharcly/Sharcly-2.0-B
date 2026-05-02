@@ -24,9 +24,9 @@ export class BlogController {
 
   static async createBlog(req: Request, res: Response) {
     try {
-      // @ts-ignore
       const authorId = req.user.id;
-      const blog = await BlogService.createBlog(req.body, authorId);
+      const file = req.file as Express.Multer.File;
+      const blog = await BlogService.createBlog(req.body, authorId, file);
       res.status(201).json({ success: true, blog });
     } catch (error: any) {
       res.status(500).json({ success: false, message: error.message });
@@ -35,7 +35,8 @@ export class BlogController {
 
   static async updateBlog(req: Request, res: Response) {
     try {
-      const blog = await BlogService.updateBlog(req.params.id as string, req.body);
+      const file = req.file as Express.Multer.File;
+      const blog = await BlogService.updateBlog(req.params.id as string, req.body, file);
       res.json({ success: true, blog });
     } catch (error: any) {
       res.status(500).json({ success: false, message: error.message });

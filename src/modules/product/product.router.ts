@@ -20,7 +20,7 @@ import {
   createType
 } from "./product.controller";
 import { authenticate, authorize } from "../../common/middlewares/auth.middleware";
-import { upload } from "../../common/utils/cloudinary";
+import { upload } from "../../common/utils/multer";
 import { validate, CreateProductSchema, UpdateProductSchema } from "../../common/middlewares/validate.middleware";
 
 const router = Router();

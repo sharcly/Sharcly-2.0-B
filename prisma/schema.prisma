@@ -220,6 +220,8 @@ model Blog {
   category        String?
   excerpt         String?
   featuredImage   String?
+  featuredImageData Bytes?
+  featuredImageMimeType String?
   keywords        String?
   metaDescription String?
   publishedAt     DateTime?

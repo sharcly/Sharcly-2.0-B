@@ -4,8 +4,8 @@ import jwt from "jsonwebtoken";
 import crypto from "crypto";
 import { sendVerificationEmail, sendOtpEmail } from "./email.service";
 
-const ACCESS_TOKEN_SECRET = process.env.JWT_SECRET || "fallback_access_secret";
-const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET || "fallback_refresh_secret";
+const ACCESS_TOKEN_SECRET = process.env.JWT_SECRET!;
+const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET!;
 const ACCESS_TOKEN_EXPIRY = "1h";
 const REFRESH_TOKEN_EXPIRY = "7d";
 
@@ -38,7 +38,8 @@ export class AuthService {
   }
 
   static async register(registerData: any) {
-    const { email, password, name, otp } = registerData;
+    const { password, name, otp } = registerData;
+    const email = registerData.email?.toLowerCase().trim();
 
     const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser) {
@@ -51,7 +52,7 @@ export class AuthService {
       throw new Error("Invalid or expired verification code.");
     }
 
-    const hashedPassword = await bcrypt.hash(password, 12);
+    const hashedPassword = await bcrypt.hash(password, 10);
     const verificationToken = crypto.randomBytes(32).toString("hex");
 
     const userRole = await prisma.role.findUnique({ where: { slug: "user" } });
@@ -108,14 +109,15 @@ export class AuthService {
     });
   }
 
-  static async sendOtp(email: string) {
+  static async sendOtp(rawEmail: string) {
+    const email = rawEmail.toLowerCase().trim();
     // Check if user already exists
     const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser) {
       throw new Error("An account with this email already exists.");
     }
 
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    const code = crypto.randomInt(100000, 999999).toString();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
     await prisma.otp.upsert({
@@ -135,7 +137,8 @@ export class AuthService {
   }
 
   static async login(loginData: any) {
-    const { email, password } = loginData;
+    const { password } = loginData;
+    const email = loginData.email?.toLowerCase().trim();
 
     const user = await prisma.user.findUnique({ 
       where: { email },
@@ -145,7 +148,7 @@ export class AuthService {
     });
 
     if (!user) {
-      throw new Error("Invalid credentials");
+      throw new Error("Account not found");
     }
 
     if (user.isBlocked) {
@@ -154,11 +157,19 @@ export class AuthService {
 
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
+      console.warn(`[Login] Password mismatch for: ${email}`);
       throw new Error("Invalid credentials");
     }
 
     const roleSlug = user.userRole?.slug || "user";
-    const tokens = await this.generateTokens(user.id, roleSlug);
+    
+    let tokens;
+    try {
+      tokens = await this.generateTokens(user.id, roleSlug);
+    } catch (tokenError: any) {
+      console.error(`[Login] Token generation failed for ${email}:`, tokenError);
+      throw new Error("Failed to initialize session. Please try again later.");
+    }
 
     return {
       tokens,
@@ -230,7 +241,7 @@ export class AuthService {
       throw new Error("Current password is incorrect");
     }
 
-    const hashedPassword = await bcrypt.hash(newPassword, 12);
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
     return await prisma.user.update({
       where: { id: userId },
       data: { password: hashedPassword }

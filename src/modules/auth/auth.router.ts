@@ -2,8 +2,21 @@ import { Router } from "express";
 import { login, register, getProfile, getMe, verifyEmail, refreshTokens, logout, changePassword, sendOtp } from "./auth.controller";
 import { authenticate } from "../../common/middlewares/auth.middleware";
 import { validate, LoginSchema, RegisterSchema, ChangePasswordSchema } from "../../common/middlewares/validate.middleware";
+import rateLimit from "express-rate-limit";
+
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10, // Limit each IP to 10 requests per window
+  message: {
+    success: false,
+    message: "Too many attempts from this IP, please try again after 15 minutes",
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 const router = Router();
+// ... (rest of the file)
 
 /**
  * @swagger
@@ -54,8 +67,8 @@ const router = Router();
  *       400:
  *         description: User already exists
  */
-router.post("/register", validate(RegisterSchema), register);
-router.post("/send-otp", sendOtp);
+router.post("/register", authLimiter, validate(RegisterSchema), register);
+router.post("/send-otp", authLimiter, sendOtp);
 
 /**
  * @swagger
@@ -96,7 +109,7 @@ router.post("/send-otp", sendOtp);
  *       401:
  *         description: Invalid credentials
  */
-router.post("/login", validate(LoginSchema), login);
+router.post("/login", authLimiter, validate(LoginSchema), login);
 
 /**
  * @swagger

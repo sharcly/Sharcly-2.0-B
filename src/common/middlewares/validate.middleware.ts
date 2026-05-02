@@ -27,12 +27,12 @@ export function validate(schema: z.ZodTypeAny) {
 // AUTH SCHEMAS
 // ─────────────────────────────────────────────────────
 export const LoginSchema = z.object({
-  email: z.email("Invalid email address").toLowerCase().trim(),
+  email: z.string().email("Invalid email address").toLowerCase().trim(),
   password: z.string().min(1, "Password is required"),
 });
 
 export const RegisterSchema = z.object({
-  email: z.email("Invalid email address").toLowerCase().trim(),
+  email: z.string().email("Invalid email address").toLowerCase().trim(),
   password: z
     .string()
     .min(8, "Password must be at least 8 characters")
@@ -42,6 +42,7 @@ export const RegisterSchema = z.object({
       "Password must contain at least one uppercase letter, one lowercase letter, and one number"
     ),
   name: z.string().min(2, "Name must be at least 2 characters").max(100, "Name too long").trim(),
+  otp: z.string().length(6, "Verification code must be 6 digits"),
 });
 
 export const ChangePasswordSchema = z.object({
@@ -144,9 +145,107 @@ export const CreateProductSchema = z.object({
     .union([z.boolean(), z.string()])
     .transform((val) => val === true || val === "true")
     .default(true),
-}).passthrough();
+});
 
 export const UpdateProductSchema = CreateProductSchema.partial();
+
+// ─────────────────────────────────────────────────────
+// BLOG SCHEMAS
+// ─────────────────────────────────────────────────────
+export const CreateBlogSchema = z.object({
+  title: z.string().min(3, "Title too short").max(255).trim(),
+  slug: z.string().max(255).trim().optional(),
+  content: z.string().min(10, "Content too short"),
+  excerpt: z.string().max(500).trim().optional(),
+  featuredImage: z.any().optional(),
+  category: z.string().max(100).trim().optional(),
+  tags: z.array(z.string()).optional(),
+  status: z.enum(["DRAFT", "PUBLISHED"]).default("DRAFT"),
+  metaTitle: z.string().max(255).optional(),
+  metaDescription: z.string().max(500).optional(),
+});
+
+export const UpdateBlogSchema = CreateBlogSchema.partial();
+
+// ─────────────────────────────────────────────────────
+// SETTINGS SCHEMAS
+// ─────────────────────────────────────────────────────
+export const StoreSettingsSchema = z.object({
+  storeName: z.string().min(1).max(100).optional(),
+  supportEmail: z.string().email().optional(),
+  currency: z.string().length(3).optional(),
+  logoUrl: z.string().url().optional().or(z.string().length(0)),
+  primaryColor: z.string().regex(/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/).optional(),
+  secondaryColor: z.string().regex(/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/).optional(),
+  siteTheme: z.enum(["light", "dark", "system"]).optional(),
+  navbarStyle: z.enum(["transparent", "solid", "glass"]).optional(),
+  buttonRadius: z.string().max(20).optional(),
+  taxRate: z.number().min(0).max(100).optional(),
+  shippingCharge: z.number().min(0).optional(),
+  freeShippingThreshold: z.number().min(0).optional(),
+});
+
+export const CreateRegionSchema = z.object({
+  name: z.string().min(2).max(100),
+  currencyCode: z.string().length(3),
+  taxRate: z.number().min(0).max(100).default(0),
+  countries: z.array(z.string()).min(1),
+});
+
+// ─────────────────────────────────────────────────────
+// MARKETING SCHEMAS
+// ─────────────────────────────────────────────────────
+export const MarketingOfferSchema = z.object({
+  title: z.string().min(3).max(200),
+  description: z.string().min(10),
+  discount: z.number().positive(),
+  isActive: z.boolean().default(true),
+});
+
+export const ClaimOfferSchema = z.object({
+  welcomeOfferId: z.string().uuid(),
+  email: z.string().email(),
+  phone: z.string().min(8),
+});
+
+// ─────────────────────────────────────────────────────
+// SEO SCHEMAS
+// ─────────────────────────────────────────────────────
+export const SeoUpsertSchema = z.object({
+  pageSlug: z.string().min(1).max(255),
+  title: z.string().max(255).optional(),
+  description: z.string().max(500).optional(),
+  keywords: z.string().max(500).optional(),
+  ogTitle: z.string().max(255).optional(),
+  ogDescription: z.string().max(500).optional(),
+  ogImage: z.string().url().optional().or(z.string().length(0)),
+  canonicalUrl: z.string().url().optional().or(z.string().length(0)),
+  robots: z.string().max(100).optional(),
+  structuredData: z.string().optional(),
+});
+
+export const GlobalSeoSchema = z.object({
+  siteName: z.string().max(100).optional(),
+  siteDescription: z.string().max(500).optional(),
+  googleAnalyticsId: z.string().max(50).optional(),
+  facebookPixelId: z.string().max(50).optional(),
+  klaviyoPublicKey: z.string().max(100).optional(),
+  klaviyoPrivateKey: z.string().max(100).optional(),
+  robotsTxt: z.string().optional(),
+});
+
+// ─────────────────────────────────────────────────────
+// CMS SCHEMAS
+// ─────────────────────────────────────────────────────
+export const CmsBulkUpdateSchema = z.object({
+  page: z.string().min(1),
+  updates: z.array(z.object({
+    section: z.string().min(1),
+    key: z.string().min(1),
+    value: z.string(),
+    type: z.string().optional().default("text")
+  })).min(1)
+});
 
 // ─────────────────────────────────────────────────────
 // ADDRESS SCHEMAS
@@ -164,7 +263,7 @@ export const CreateAddressSchema = z.object({
 // ADMIN USER SCHEMAS
 // ─────────────────────────────────────────────────────
 export const AdminCreateUserSchema = z.object({
-  email: z.email("Invalid email").toLowerCase().trim(),
+  email: z.string().email("Invalid email").toLowerCase().trim(),
   password: z.string().min(8, "Password must be at least 8 characters").max(72, "Password too long"),
   name: z.string().min(2).max(100).trim(),
   role: z.string().optional(),
@@ -172,7 +271,7 @@ export const AdminCreateUserSchema = z.object({
 });
 
 export const AdminUpdateUserSchema = z.object({
-  email: z.email("Invalid email").toLowerCase().trim().optional(),
+  email: z.string().email("Invalid email").toLowerCase().trim().optional(),
   password: z.string().min(8, "Password must be at least 8 characters").max(72).optional(),
   name: z.string().min(2).max(100).trim().optional(),
   role: z.string().optional(),
