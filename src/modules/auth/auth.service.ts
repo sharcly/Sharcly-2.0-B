@@ -158,11 +158,18 @@ export class AuthService {
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
       console.warn(`[Login] Password mismatch for: ${email}`);
-      throw new Error("Password mismatch");
+      throw new Error("Invalid credentials");
     }
 
     const roleSlug = user.userRole?.slug || "user";
-    const tokens = await this.generateTokens(user.id, roleSlug);
+    
+    let tokens;
+    try {
+      tokens = await this.generateTokens(user.id, roleSlug);
+    } catch (tokenError: any) {
+      console.error(`[Login] Token generation failed for ${email}:`, tokenError);
+      throw new Error("Failed to initialize session. Please try again later.");
+    }
 
     return {
       tokens,
