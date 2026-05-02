@@ -180,7 +180,7 @@ export const createProduct = async (req: Request, res: Response) => {
         name,
         subtitle,
         slug: finalSlug,
-        sku: (sku && typeof sku === "string" && sku.trim() !== "") ? sku.trim() : null,
+        sku: sku || null,
         description,
         status: status || "DRAFT",
         price: (price !== undefined && price !== "" && price !== "null") ? parseFloat(price as string) : 0,
@@ -216,23 +216,16 @@ export const createProduct = async (req: Request, res: Response) => {
           create: processedImages
         },
         variants: {
-          create: variantData.map((v: any, idx: number) => {
-            const vSku = (v.sku && typeof v.sku === "string" && v.sku.trim() !== "") ? v.sku.trim() : null;
-            const vPrice = (v.price !== undefined && v.price !== "" && v.price !== "null") ? parseFloat(v.price) : 
-                           ((v.prices?.[0]?.amount !== undefined && v.prices?.[0]?.amount !== "") ? parseFloat(v.prices[0].amount) : 0);
-            const vStock = v.inventoryQuantity || v.stock || 0;
-            const vStockNum = (vStock !== undefined && vStock !== "" && vStock !== "null") ? parseInt(vStock as string) : 0;
-
-            return {
-              title: v.title,
-              sku: vSku,
-              price: isNaN(vPrice) ? 0 : vPrice,
-              inventoryQuantity: isNaN(vStockNum) ? 0 : vStockNum,
-              manageInventory: v.manageInventory === "true" || v.manageInventory === true || v.manageInventory === undefined,
-              allowBackorder: v.allowBackorder === "true" || v.allowBackorder === true,
-              options: v.options
-            };
-          })
+          create: variantData.map((v: any, idx: number) => ({
+            title: v.title,
+            sku: v.sku || null,
+            price: parseFloat(v.price || v.prices?.[0]?.amount || v.price || 0),
+            inventoryQuantity: parseInt(v.inventoryQuantity || v.stock || 0),
+            manageInventory: v.manageInventory === "true" || v.manageInventory === true || v.manageInventory === undefined,
+            allowBackorder: v.allowBackorder === "true" || v.allowBackorder === true,
+            // image: variantImagesMap.get(idx) ? "BINARY_LATER" : (typeof v.image === 'string' ? v.image : null),
+            options: v.options
+          }))
         }
       },
       include: {
@@ -340,7 +333,7 @@ export const updateProduct = async (req: Request, res: Response) => {
         name,
         subtitle,
         slug,
-        sku: (sku && typeof sku === "string" && sku.trim() !== "") ? sku.trim() : (sku === null || sku === "" ? null : undefined),
+        sku: sku || null,
         description,
         status,
         price: (price !== undefined && price !== "" && price !== "null") ? parseFloat(price as string) : undefined,
@@ -378,22 +371,15 @@ export const updateProduct = async (req: Request, res: Response) => {
         } : undefined,
         variants: variantData ? {
           deleteMany: {},
-          create: variantData.map((v: any) => {
-            const vSku = (v.sku && typeof v.sku === "string" && v.sku.trim() !== "") ? v.sku.trim() : null;
-            const vPrice = (v.price !== undefined && v.price !== "" && v.price !== "null") ? parseFloat(v.price) : 0;
-            const vStock = v.inventoryQuantity || v.stock || 0;
-            const vStockNum = (vStock !== undefined && vStock !== "" && vStock !== "null") ? parseInt(vStock as string) : 0;
-
-            return {
-              title: v.title,
-              sku: vSku,
-              price: isNaN(vPrice) ? 0 : vPrice,
-              inventoryQuantity: isNaN(vStockNum) ? 0 : vStockNum,
-              manageInventory: v.manageInventory === "true" || v.manageInventory === true || v.manageInventory === undefined,
-              allowBackorder: v.allowBackorder === "true" || v.allowBackorder === true,
-              options: v.options
-            };
-          })
+          create: variantData.map((v: any) => ({
+            title: v.title,
+            sku: v.sku || null,
+            price: parseFloat(v.price || 0),
+            inventoryQuantity: parseInt(v.inventoryQuantity || v.stock || 0),
+            manageInventory: v.manageInventory === "true" || v.manageInventory === true || v.manageInventory === undefined,
+            allowBackorder: v.allowBackorder === "true" || v.allowBackorder === true,
+            options: v.options
+          }))
         } : undefined
       },
       include: {
