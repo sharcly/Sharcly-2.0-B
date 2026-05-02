@@ -247,4 +247,39 @@ export class AuthService {
       data: { password: hashedPassword }
     });
   }
+
+  static async forgotPassword(email: string) {
+    const user = await prisma.user.findUnique({ where: { email: email.toLowerCase().trim() } });
+    if (!user) {
+      // Don't reveal if user exists for security
+      return;
+    }
+
+    const resetToken = jwt.sign(
+      { id: user.id, purpose: "password_reset" },
+      ACCESS_TOKEN_SECRET,
+      { expiresIn: "7h" }
+    );
+
+    await sendPasswordResetEmail(user.email, resetToken);
+  }
+
+  static async resetPassword(token: string, newPassword: string) {
+    let payload: any;
+    try {
+      payload = jwt.verify(token, ACCESS_TOKEN_SECRET);
+    } catch (err) {
+      throw new Error("Invalid or expired reset token");
+    }
+
+    if (payload.purpose !== "password_reset") {
+      throw new Error("Invalid token purpose");
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    await prisma.user.update({
+      where: { id: payload.id },
+      data: { password: hashedPassword }
+    });
+  }
 }
