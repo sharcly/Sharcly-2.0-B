@@ -200,5 +200,6 @@ router.get("/me", authenticate, getMe);
 router.post("/change-password", authenticate, validate(ChangePasswordSchema), changePassword);
 router.post("/forgot-password", validate(ForgotPasswordSchema), forgotPassword);
 router.post("/reset-password", validate(ResetPasswordSchema), resetPassword);
+router.patch("/deactivate", authenticate, deactivateAccount);
 
 export default router;

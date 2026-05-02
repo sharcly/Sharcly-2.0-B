@@ -282,4 +282,13 @@ export class AuthService {
       data: { password: hashedPassword }
     });
   }
+
+  static async deactivateAccount(userId: string) {
+    // Simply block the user or mark as deleted
+    // For now, we'll mark as isBlocked and clear refreshToken
+    return await prisma.user.update({
+      where: { id: userId },
+      data: { isBlocked: true, refreshToken: null }
+    });
+  }
 }
