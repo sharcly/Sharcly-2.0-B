@@ -24,9 +24,11 @@ export const csrfProtection = (req: Request, res: Response, next: NextFunction) 
   // Attach to locals for response body usage
   res.locals.csrfToken = csrfToken;
 
-  // 2. Skip validation for safe methods
+  // 2. Skip validation for safe methods AND specific routes like login/register
   const safeMethods = ["GET", "HEAD", "OPTIONS"];
-  if (safeMethods.includes(req.method)) {
+  const skipRoutes = ["/api/auth/login", "/api/auth/register", "/api/auth/send-otp"]; 
+  
+  if (safeMethods.includes(req.method) || skipRoutes.some(route => req.originalUrl.includes(route))) {
     return next();
   }
 
