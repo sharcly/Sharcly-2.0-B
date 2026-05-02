@@ -31,11 +31,27 @@ export const csrfProtection = (req: Request, res: Response, next: NextFunction) 
   // We check the header sent by the frontend
   const headerToken = req.headers["x-csrf-token"];
 
-  if (!headerToken || headerToken !== csrfToken) {
-    console.warn(`[CSRF] 403: Invalid or missing token for ${req.method} ${req.originalUrl}`);
+  if (!headerToken) {
+    console.warn(`[CSRF] 403: Missing token for ${req.method} ${req.originalUrl}`);
     return res.status(403).json({
       success: false,
-      message: "Invalid or missing CSRF token",
+      message: "CSRF token missing from request headers",
+    });
+  }
+
+  if (!csrfToken) {
+    console.warn(`[CSRF] 403: Missing cookie for ${req.method} ${req.originalUrl}`);
+    return res.status(403).json({
+      success: false,
+      message: "CSRF cookie missing or expired",
+    });
+  }
+
+  if (headerToken !== csrfToken) {
+    console.warn(`[CSRF] 403: Token mismatch for ${req.method} ${req.originalUrl}`);
+    return res.status(403).json({
+      success: false,
+      message: "Invalid CSRF token",
     });
   }
 
