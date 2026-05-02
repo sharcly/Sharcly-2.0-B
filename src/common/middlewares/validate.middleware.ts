@@ -42,6 +42,7 @@ export const RegisterSchema = z.object({
       "Password must contain at least one uppercase letter, one lowercase letter, and one number"
     ),
   name: z.string().min(2, "Name must be at least 2 characters").max(100, "Name too long").trim(),
+  otp: z.string().length(6, "Verification code must be 6 digits"),
 });
 
 export const ChangePasswordSchema = z.object({
