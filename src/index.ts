@@ -17,7 +17,7 @@ import apiRoutes from "./routes";
 import { bootstrap } from "./common/utils/bootstrap";
 import imageRouter from "./modules/image/image.router";
 import { BlogWorker } from "./modules/blog/blog.worker";
-import { track } from "@vercel/analytics/server";
+// import { track } from "@vercel/analytics/server"; // Replaced with dynamic import below
 
 const app = express();
 const port = process.env.PORT || 5000;
@@ -89,12 +89,17 @@ app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
 // Vercel Analytics Middleware (Track API Hits)
-app.use((req, res, next) => {
+app.use(async (req, res, next) => {
   if (process.env.VERCEL) {
-    track("api_hit", {
-      path: req.path,
-      method: req.method,
-    });
+    try {
+      const { track } = await import("@vercel/analytics/server");
+      track("api_hit", {
+        path: req.path,
+        method: req.method,
+      });
+    } catch (err) {
+      // Ignore analytics errors to prevent app crash
+    }
   }
   next();
 });
