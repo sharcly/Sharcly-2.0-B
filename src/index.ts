@@ -17,6 +17,7 @@ import apiRoutes from "./routes";
 import { bootstrap } from "./common/utils/bootstrap";
 import imageRouter from "./modules/image/image.router";
 import { BlogWorker } from "./modules/blog/blog.worker";
+import { track } from "@vercel/analytics";
 
 const app = express();
 const port = process.env.PORT || 5000;
@@ -86,6 +87,17 @@ app.use(cookieParser());
 
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+
+// Vercel Analytics Middleware (Track API Hits)
+app.use((req, res, next) => {
+  if (process.env.VERCEL) {
+    track("api_hit", {
+      path: req.path,
+      method: req.method,
+    }).catch(() => {});
+  }
+  next();
+});
 
 /* ─────────────────────────────────────────────
    Rate Limiting
