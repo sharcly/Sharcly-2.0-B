@@ -1,5 +1,6 @@
 import { prisma } from "../../common/lib/prisma";
 import { BlogStatus } from "@prisma/client";
+import { optimizeImage } from "../image/image.service";
 
 export class BlogService {
   static async getBlogs(query: any) {
@@ -51,18 +52,27 @@ export class BlogService {
     });
   }
 
-  static async createBlog(blogData: any, authorId: string) {
-    const { title, slug, content, excerpt, featuredImage, status, publishedAt, metaTitle, metaDescription, category, tags } = blogData;
+  static async createBlog(blogData: any, authorId: string, file?: Express.Multer.File) {
+    const { title, slug, content, excerpt, status, publishedAt, metaTitle, metaDescription, category, tags } = blogData;
     
+    let featuredImageData: Buffer | undefined;
+    let featuredImageMimeType: string | undefined;
+
+    if (file) {
+      featuredImageData = await optimizeImage(file.buffer);
+      featuredImageMimeType = "image/webp";
+    }
+
     return await prisma.blog.create({
       data: {
         title,
         slug,
         content,
         excerpt,
-        featuredImage,
+        featuredImageData,
+        featuredImageMimeType,
         category,
-        tags,
+        tags: Array.isArray(tags) ? tags : (tags ? [tags] : []),
         status: status || BlogStatus.DRAFT,
         publishedAt: publishedAt ? new Date(publishedAt) : (status === BlogStatus.PUBLISHED ? new Date() : null),
         authorId,
@@ -72,13 +82,23 @@ export class BlogService {
     });
   }
 
-  static async updateBlog(id: string, blogData: any) {
+  static async updateBlog(id: string, blogData: any, file?: Express.Multer.File) {
     const { publishedAt, ...rest } = blogData;
     
+    let featuredImageData: Buffer | undefined;
+    let featuredImageMimeType: string | undefined;
+
+    if (file) {
+      featuredImageData = await optimizeImage(file.buffer);
+      featuredImageMimeType = "image/webp";
+    }
+
     return await prisma.blog.update({
       where: { id },
       data: {
         ...rest,
+        featuredImageData,
+        featuredImageMimeType,
         publishedAt: publishedAt ? new Date(publishedAt) : undefined
       }
     });
