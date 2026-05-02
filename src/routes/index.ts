@@ -16,6 +16,7 @@ import searchRoutes from "../modules/search/search.router";
 import addressRoutes from "../modules/address/address.router";
 import marketingRoutes from "../modules/marketing/marketing.router";
 import paymentRoutes from "../modules/payment/payment.router";
+import testimonialRoutes from "../modules/testimonial/testimonial.router";
 
 const router = Router();
 
@@ -36,5 +37,6 @@ router.use("/search", searchRoutes);
 router.use("/addresses", addressRoutes);
 router.use("/marketing", marketingRoutes);
 router.use("/payments", paymentRoutes);
+router.use("/testimonials", testimonialRoutes);
 
 export default router;
