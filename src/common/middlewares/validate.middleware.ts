@@ -57,6 +57,22 @@ export const ChangePasswordSchema = z.object({
     ),
 });
 
+export const ForgotPasswordSchema = z.object({
+  email: z.string().email("Invalid email address").toLowerCase().trim(),
+});
+
+export const ResetPasswordSchema = z.object({
+  token: z.string().min(1, "Token is required"),
+  password: z
+    .string()
+    .min(8, "Password must be at least 8 characters")
+    .max(72, "Password too long")
+    .regex(
+      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/,
+      "Password must contain at least one uppercase letter, one lowercase letter, and one number"
+    ),
+});
+
 // ─────────────────────────────────────────────────────
 // ORDER SCHEMAS
 // ─────────────────────────────────────────────────────
