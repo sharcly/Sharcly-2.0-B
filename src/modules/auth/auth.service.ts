@@ -158,11 +158,18 @@ export class AuthService {
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
       console.warn(`[Login] Password mismatch for: ${email}`);
-      throw new Error("Password mismatch");
+      throw new Error("Invalid credentials");
     }
 
     const roleSlug = user.userRole?.slug || "user";
-    const tokens = await this.generateTokens(user.id, roleSlug);
+    
+    let tokens;
+    try {
+      tokens = await this.generateTokens(user.id, roleSlug);
+    } catch (tokenError: any) {
+      console.error(`[Login] Token generation failed for ${email}:`, tokenError);
+      throw new Error("Failed to initialize session. Please try again later.");
+    }
 
     return {
       tokens,
@@ -237,6 +244,41 @@ export class AuthService {
     const hashedPassword = await bcrypt.hash(newPassword, 10);
     return await prisma.user.update({
       where: { id: userId },
+      data: { password: hashedPassword }
+    });
+  }
+
+  static async forgotPassword(email: string) {
+    const user = await prisma.user.findUnique({ where: { email: email.toLowerCase().trim() } });
+    if (!user) {
+      // Don't reveal if user exists for security
+      return;
+    }
+
+    const resetToken = jwt.sign(
+      { id: user.id, purpose: "password_reset" },
+      ACCESS_TOKEN_SECRET,
+      { expiresIn: "7h" }
+    );
+
+    await sendPasswordResetEmail(user.email, resetToken);
+  }
+
+  static async resetPassword(token: string, newPassword: string) {
+    let payload: any;
+    try {
+      payload = jwt.verify(token, ACCESS_TOKEN_SECRET);
+    } catch (err) {
+      throw new Error("Invalid or expired reset token");
+    }
+
+    if (payload.purpose !== "password_reset") {
+      throw new Error("Invalid token purpose");
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    await prisma.user.update({
+      where: { id: payload.id },
       data: { password: hashedPassword }
     });
   }

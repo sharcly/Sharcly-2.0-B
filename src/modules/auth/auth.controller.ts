@@ -148,9 +148,31 @@ export const getMe = async (req: any, res: Response) => {
 
 export const changePassword = async (req: any, res: Response) => {
   try {
-    await AuthService.changePassword(req.user.id, req.body);
+    const userId = req.user.id;
+    const { currentPassword, newPassword } = req.body;
+    await AuthService.changePassword(userId, { currentPassword, newPassword });
     res.status(200).json({ success: true, message: "Password updated successfully" });
   } catch (error: any) {
-    res.status(400).json({ message: error.message || "Password update failed" });
+    res.status(400).json({ message: error.message || "Failed to update password" });
+  }
+};
+
+export const forgotPassword = async (req: Request, res: Response) => {
+  try {
+    const { email } = req.body;
+    await AuthService.forgotPassword(email);
+    res.status(200).json({ success: true, message: "If an account exists with this email, a reset link has been sent." });
+  } catch (error: any) {
+    res.status(400).json({ message: error.message || "Failed to process request" });
+  }
+};
+
+export const resetPassword = async (req: Request, res: Response) => {
+  try {
+    const { token, password } = req.body;
+    await AuthService.resetPassword(token, password);
+    res.status(200).json({ success: true, message: "Your password has been reset successfully." });
+  } catch (error: any) {
+    res.status(400).json({ message: error.message || "Failed to reset password" });
   }
 };

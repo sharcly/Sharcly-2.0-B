@@ -30,51 +30,33 @@ app.set("trust proxy", 1);
 
 const allowedOrigins = [
   "http://localhost:3000",
-  "http://localhost:5173", // Common Vite port
+  "http://localhost:5173",
   "https://sharcly.io",
   "https://www.sharcly.io",
   "https://sharcly-2-0.vercel.app",
-  process.env.FRONTEND_URL
+  process.env.FRONTEND_URL,
 ].filter(Boolean) as string[];
 
 const corsOptions: cors.CorsOptions = {
   origin: (origin, callback) => {
-    // 1. Allow non-browser requests
     if (!origin) return callback(null, true);
-
+    
     const normalizedOrigin = origin.replace(/\/$/, "").toLowerCase();
-
-    // 2. Check against explicit allowed list
-    const isAllowed = allowedOrigins.some(o => {
-      if (!o) return false;
-      return o.toLowerCase().replace(/\/$/, "") === normalizedOrigin;
-    });
-
-    // 3. Allow all Vercel subdomains (previews, branches, etc.)
-    const isVercel = normalizedOrigin.endsWith(".vercel.app");
+    const isAllowed = allowedOrigins.some(o => o.toLowerCase().replace(/\/$/, "") === normalizedOrigin);
+    const isVercel = normalizedOrigin.endsWith(".vercel.app") || normalizedOrigin.includes("sharcly");
 
     if (isAllowed || isVercel) {
       callback(null, true);
     } else {
+      console.warn(`[CORS] Blocked origin: ${origin}`);
       callback(null, false);
     }
   },
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-  allowedHeaders: [
-    "Content-Type",
-    "Authorization",
-    "X-Requested-With",
-    "Accept",
-    "X-CSRF-Token",
-    "X-Api-Version",
-    "sentry-trace",
-    "baggage",
-    "x-vercel-id",
-    "x-vercel-cache"
-  ],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept", "X-CSRF-Token", "X-Api-Version"],
   exposedHeaders: ["set-cookie"],
-  optionsSuccessStatus: 200, // Important for Vercel/legacy browser support
+  optionsSuccessStatus: 200,
   maxAge: 86400
 };
 
@@ -127,11 +109,7 @@ app.use("/api", csrfProtection);
 ──────────────────────────────────────────── */
 
 app.get("/api/health", (req: Request, res: Response) => {
-  res.json({
-    status: "ok",
-    timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV
-  });
+  res.json({ status: "ok" });
 });
 
 
