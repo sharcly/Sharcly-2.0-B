@@ -27,12 +27,12 @@ export function validate(schema: z.ZodTypeAny) {
 // AUTH SCHEMAS
 // ─────────────────────────────────────────────────────
 export const LoginSchema = z.object({
-  email: z.email("Invalid email address").toLowerCase().trim(),
+  email: z.string().email("Invalid email address").toLowerCase().trim(),
   password: z.string().min(1, "Password is required"),
 });
 
 export const RegisterSchema = z.object({
-  email: z.email("Invalid email address").toLowerCase().trim(),
+  email: z.string().email("Invalid email address").toLowerCase().trim(),
   password: z
     .string()
     .min(8, "Password must be at least 8 characters")
@@ -165,7 +165,7 @@ export const CreateAddressSchema = z.object({
 // ADMIN USER SCHEMAS
 // ─────────────────────────────────────────────────────
 export const AdminCreateUserSchema = z.object({
-  email: z.email("Invalid email").toLowerCase().trim(),
+  email: z.string().email("Invalid email").toLowerCase().trim(),
   password: z.string().min(8, "Password must be at least 8 characters").max(72, "Password too long"),
   name: z.string().min(2).max(100).trim(),
   role: z.string().optional(),
@@ -173,7 +173,7 @@ export const AdminCreateUserSchema = z.object({
 });
 
 export const AdminUpdateUserSchema = z.object({
-  email: z.email("Invalid email").toLowerCase().trim().optional(),
+  email: z.string().email("Invalid email").toLowerCase().trim().optional(),
   password: z.string().min(8, "Password must be at least 8 characters").max(72).optional(),
   name: z.string().min(2).max(100).trim().optional(),
   role: z.string().optional(),

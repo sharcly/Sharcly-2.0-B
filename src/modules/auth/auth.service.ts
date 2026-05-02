@@ -52,7 +52,7 @@ export class AuthService {
       throw new Error("Invalid or expired verification code.");
     }
 
-    const hashedPassword = await bcrypt.hash(password, 12);
+    const hashedPassword = await bcrypt.hash(password, 10);
     const verificationToken = crypto.randomBytes(32).toString("hex");
 
     const userRole = await prisma.role.findUnique({ where: { slug: "user" } });
@@ -148,7 +148,7 @@ export class AuthService {
     });
 
     if (!user) {
-      throw new Error("Invalid credentials");
+      throw new Error("Account not found");
     }
 
     if (user.isBlocked) {
@@ -157,7 +157,8 @@ export class AuthService {
 
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
-      throw new Error("Invalid credentials");
+      console.warn(`[Login] Password mismatch for: ${email}`);
+      throw new Error("Password mismatch");
     }
 
     const roleSlug = user.userRole?.slug || "user";
@@ -233,7 +234,7 @@ export class AuthService {
       throw new Error("Current password is incorrect");
     }
 
-    const hashedPassword = await bcrypt.hash(newPassword, 12);
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
     return await prisma.user.update({
       where: { id: userId },
       data: { password: hashedPassword }
