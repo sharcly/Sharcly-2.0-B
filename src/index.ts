@@ -112,7 +112,8 @@ app.get("/api/health", (req: Request, res: Response) => {
   res.json({
     status: "ok",
     timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV
+    environment: process.env.NODE_ENV,
+    csrfToken: res.locals.csrfToken // Send token in body as fallback
   });
 });
 
