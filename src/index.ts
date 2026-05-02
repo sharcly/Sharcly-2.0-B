@@ -17,7 +17,7 @@ import apiRoutes from "./routes";
 import { bootstrap } from "./common/utils/bootstrap";
 import imageRouter from "./modules/image/image.router";
 import { BlogWorker } from "./modules/blog/blog.worker";
-import { track } from "@vercel/analytics";
+import { track } from "@vercel/analytics/server";
 
 const app = express();
 const port = process.env.PORT || 5000;
@@ -94,7 +94,7 @@ app.use((req, res, next) => {
     track("api_hit", {
       path: req.path,
       method: req.method,
-    }).catch(() => {});
+    });
   }
   next();
 });
