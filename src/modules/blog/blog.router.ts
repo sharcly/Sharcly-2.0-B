@@ -1,3 +1,4 @@
+import { Router } from "express";
 import { BlogController } from "./blog.controller";
 import { authenticate, authorize } from "../../common/middlewares/auth.middleware";
 import { validate, CreateBlogSchema, UpdateBlogSchema } from "../../common/middlewares/validate.middleware";
