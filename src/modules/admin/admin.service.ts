@@ -54,7 +54,8 @@ export class AdminService {
   }
 
   static async createUser(userData: any) {
-    const { email, password, name, roleId } = userData;
+    const { password, name, roleId } = userData;
+    const email = userData.email?.toLowerCase().trim();
 
     const roleExists = await prisma.role.findUnique({ where: { id: roleId } });
     if (!roleExists) {
@@ -89,7 +90,8 @@ export class AdminService {
   }
 
   static async updateUser(id: string, updateData: any) {
-    const { email, password, name, roleId } = updateData;
+    const { password, name, roleId } = updateData;
+    const email = updateData.email?.toLowerCase().trim();
 
     const prismaUpdateData: any = {};
     if (email) prismaUpdateData.email = email;

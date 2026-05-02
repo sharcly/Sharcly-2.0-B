@@ -38,7 +38,8 @@ export class AuthService {
   }
 
   static async register(registerData: any) {
-    const { email, password, name, otp } = registerData;
+    const { password, name, otp } = registerData;
+    const email = registerData.email?.toLowerCase().trim();
 
     const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser) {
@@ -108,7 +109,8 @@ export class AuthService {
     });
   }
 
-  static async sendOtp(email: string) {
+  static async sendOtp(rawEmail: string) {
+    const email = rawEmail.toLowerCase().trim();
     // Check if user already exists
     const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser) {
@@ -135,7 +137,8 @@ export class AuthService {
   }
 
   static async login(loginData: any) {
-    const { email, password } = loginData;
+    const { password } = loginData;
+    const email = loginData.email?.toLowerCase().trim();
 
     const user = await prisma.user.findUnique({ 
       where: { email },
