@@ -161,6 +161,27 @@ export const CreateProductSchema = z.object({
     .union([z.boolean(), z.string()])
     .transform((val) => val === true || val === "true")
     .default(true),
+  // Additional fields (added to prevent stripping by zod)
+  typeId: z.string().optional().nullable(),
+  tags: z.union([z.string(), z.array(z.string())]).optional(),
+  collections: z.union([z.string(), z.array(z.string())]).optional(),
+  variants: z.union([z.string(), z.array(z.any())]).optional(),
+  options: z.union([z.string(), z.any()]).optional(),
+  metadata: z.union([z.string(), z.any()]).optional(),
+  weight: z.union([z.string(), z.number()]).optional().nullable(),
+  length: z.union([z.string(), z.number()]).optional().nullable(),
+  height: z.union([z.string(), z.number()]).optional().nullable(),
+  width: z.union([z.string(), z.number()]).optional().nullable(),
+  originCountry: z.string().optional().nullable(),
+  material: z.string().optional().nullable(),
+  hsCode: z.string().optional().nullable(),
+  midCode: z.string().optional().nullable(),
+  metaTitle: z.string().optional().nullable(),
+  metaDescription: z.string().optional().nullable(),
+  keywords: z.union([z.string(), z.array(z.string())]).optional(),
+  canonicalUrl: z.string().optional().nullable(),
+  ogImage: z.string().optional().nullable(),
+  changefreq: z.string().optional().nullable(),
 });
 
 export const UpdateProductSchema = CreateProductSchema.partial();
