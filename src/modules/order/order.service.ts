@@ -3,6 +3,7 @@ import { OrderStatus } from "@prisma/client";
 import { sendOrderConfirmation } from "../auth/email.service";
 import { KlaviyoService } from "../marketing/klaviyo.service";
 import { SeoService } from "../seo/seo.service";
+import { PaymentService } from "../payment/payment.service";
 
 import crypto from "crypto";
 import bcrypt from "bcryptjs";
@@ -187,19 +188,33 @@ export class OrderService {
       return newOrder;
     });
 
+    // 5. Handle Stripe Payment Intent if online
+    let clientSecret: string | undefined = undefined;
+    if (paymentMethod === 'online') {
+      try {
+        const paymentIntent = await PaymentService.createPaymentIntent(
+          totals.totalAmount,
+          "usd",
+          { orderId: order.id, userId: finalUserId }
+        );
+        clientSecret = paymentIntent.client_secret || undefined;
+      } catch (pErr) {
+        console.warn("Stripe Payment Intent Creation Failed:", pErr);
+        // We still created the order, but frontend will see error if no clientSecret
+      }
+    }
+
     // Klaviyo Tracking
     try {
       const seoSettings = await SeoService.getGlobalSettings();
-      if (seoSettings?.klaviyoPrivateKey) {
-        KlaviyoService.init(seoSettings.klaviyoPrivateKey);
-        await KlaviyoService.trackEvent(email, "Placed Order", {
-          "$value": Number(order.totalAmount),
-          "OrderID": order.id,
-          "ItemNames": order.items.map((i: any) => i.productId), // ideally fetch names
-          "ShippingAddress": order.shippingAddress,
-          "BillingAddress": order.billingAddress,
-        });
-      }
+      KlaviyoService.init(seoSettings?.klaviyoPrivateKey);
+      await KlaviyoService.trackEvent(email, "Placed Order", {
+        "$value": Number(order.totalAmount),
+        "OrderID": order.id,
+        "ItemNames": order.items.map((i: any) => i.productId), // ideally fetch names
+        "ShippingAddress": order.shippingAddress,
+        "BillingAddress": order.billingAddress,
+      });
     } catch (kErr) {
       console.warn("Klaviyo Order Tracking Failed:", kErr);
     }
@@ -211,7 +226,7 @@ export class OrderService {
       console.warn("Email Confirmation Failed:", eErr);
     }
 
-    return order;
+    return { ...order, clientSecret };
   }
 
   static async getMyOrders(userId: string) {

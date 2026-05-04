@@ -103,20 +103,18 @@ export class MarketingService {
     // 7. Klaviyo Sync & Event Tracking
     try {
       const seoSettings = await SeoService.getGlobalSettings();
-      if (seoSettings?.klaviyoPrivateKey) {
-        KlaviyoService.init(seoSettings.klaviyoPrivateKey);
-        
-        // Sync Profile
-        await KlaviyoService.syncProfile({ email, phone });
-        
-        // Track Event
-        await KlaviyoService.trackEvent(email, "Claimed Welcome Offer", {
-          "OfferTitle": offer.title,
-          "CouponCode": couponCode,
-          "Discount": offer.discount,
-          "DiscountType": offer.discountType
-        });
-      }
+      KlaviyoService.init(seoSettings?.klaviyoPrivateKey);
+      
+      // Sync Profile
+      await KlaviyoService.syncProfile({ email, phone });
+      
+      // Track Event
+      await KlaviyoService.trackEvent(email, "Claimed Welcome Offer", {
+        "OfferTitle": offer.title,
+        "CouponCode": couponCode,
+        "Discount": offer.discount,
+        "DiscountType": offer.discountType
+      });
     } catch (kErr) {
       console.warn("Klaviyo Offer Claim Tracking Failed:", kErr);
     }

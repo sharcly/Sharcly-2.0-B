@@ -3,8 +3,11 @@ import { Klaviyo, Link } from "klaviyo-api";
 export class KlaviyoService {
   private static client: any;
 
-  static init(apiKey: string) {
-    this.client = (require('klaviyo-api') as any).Klaviyo(apiKey);
+  static init(apiKey?: string) {
+    const key = apiKey || process.env.KLAVIYO_PRIVATE_API_KEY;
+    if (key) {
+      this.client = (require('klaviyo-api') as any).Klaviyo(key);
+    }
   }
 
   /**
