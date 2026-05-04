@@ -89,10 +89,17 @@ export const login = async (req: Request, res: Response) => {
 
 export const refreshTokens = async (req: Request, res: Response) => {
   try {
-    // Accept refresh token from body OR from httpOnly cookie
-    const refreshToken = req.body.refreshToken || (req as any).cookies?.refresh_token;
+    const bodyToken = req.body.refreshToken;
+    const cookieToken = (req as any).cookies?.refresh_token;
+    
+    const refreshToken = bodyToken || cookieToken;
+
     if (!refreshToken) {
-      return res.status(400).json({ message: "Refresh token is required" });
+      console.warn("[Auth] Refresh token missing. Body:", !!bodyToken, "Cookie:", !!cookieToken);
+      return res.status(400).json({ 
+        success: false,
+        message: "Refresh token is required" 
+      });
     }
 
     const tokens = await AuthService.refreshTokens(refreshToken);
@@ -112,7 +119,11 @@ export const refreshTokens = async (req: Request, res: Response) => {
       ...tokens
     });
   } catch (error: any) {
-    res.status(401).json({ message: error.message || "Token refresh failed" });
+    console.error("[Auth] Refresh token failed:", error.message);
+    res.status(401).json({ 
+      success: false,
+      message: error.message || "Token refresh failed" 
+    });
   }
 };
 

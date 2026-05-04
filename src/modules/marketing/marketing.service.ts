@@ -1,6 +1,8 @@
 import { prisma } from "../../common/lib/prisma";
 import { sendWelcomeCoupon } from "../auth/email.service";
 import crypto from "crypto";
+import { KlaviyoService } from "./klaviyo.service";
+import { SeoService } from "../seo/seo.service";
 
 export class MarketingService {
   static async getActiveOffers() {
@@ -20,8 +22,15 @@ export class MarketingService {
     return await prisma.welcomeOffer.create({
       data: {
         title: data.title,
+        subtitle: data.subtitle,
         description: data.description,
         discount: data.discount,
+        discountType: data.discountType || "FIXED",
+        image: data.image,
+        options: data.options,
+        step2Title: data.step2Title,
+        step2Text: data.step2Text,
+        footerText: data.footerText,
         isActive: data.isActive !== undefined ? data.isActive : true
       }
     });
@@ -68,7 +77,7 @@ export class MarketingService {
       data: {
         code: couponCode,
         discount: offer.discount,
-        discountType: "PERCENTAGE",
+        discountType: offer.discountType as any,
         expiryDate,
         usageLimit: 1
       }
@@ -86,9 +95,30 @@ export class MarketingService {
 
     // 6. Send email
     try {
-      await sendWelcomeCoupon(email, couponCode, offer.discount.toString());
+      await sendWelcomeCoupon(email, couponCode, offer.discount.toString(), offer.discountType);
     } catch (error) {
       console.error("Failed to send welcome coupon email:", error);
+    }
+    
+    // 7. Klaviyo Sync & Event Tracking
+    try {
+      const seoSettings = await SeoService.getGlobalSettings();
+      if (seoSettings?.klaviyoPrivateKey) {
+        KlaviyoService.init(seoSettings.klaviyoPrivateKey);
+        
+        // Sync Profile
+        await KlaviyoService.syncProfile({ email, phone });
+        
+        // Track Event
+        await KlaviyoService.trackEvent(email, "Claimed Welcome Offer", {
+          "OfferTitle": offer.title,
+          "CouponCode": couponCode,
+          "Discount": offer.discount,
+          "DiscountType": offer.discountType
+        });
+      }
+    } catch (kErr) {
+      console.warn("Klaviyo Offer Claim Tracking Failed:", kErr);
     }
 
     return claim;

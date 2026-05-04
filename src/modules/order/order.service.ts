@@ -5,33 +5,14 @@ import { KlaviyoService } from "../marketing/klaviyo.service";
 import { SeoService } from "../seo/seo.service";
 
 import crypto from "crypto";
+import bcrypt from "bcryptjs";
 
 export class OrderService {
-  static async createOrder(userId: string | undefined, email: string, orderData: any) {
-    const { items, shippingAddress, billingAddress, couponCode, paymentMethod } = orderData;
-
-    // Secure user identification
-    let finalUserId = userId;
-    if (!finalUserId) {
-      let guestUser = await prisma.user.findUnique({ where: { email } });
-      if (!guestUser) {
-        // Explicitly assign 'user' role to guest accounts
-        const userRole = await prisma.role.findUnique({ where: { slug: "user" } });
-        guestUser = await prisma.user.create({
-          data: {
-             email,
-             password: `guest_${crypto.randomBytes(16).toString("hex")}`,
-             name: "Guest Shopper",
-             ...(userRole ? { roleId: userRole.id } : {})
-          }
-        });
-      }
-      finalUserId = guestUser.id;
-    }
-
-    // Calculate total and validate stock
-    let totalAmount = 0;
-    const orderItems: { productId: string; variantId?: string; quantity: number; price: number }[] = [];
+  static async calculateOrderTotals(orderData: any) {
+    const { items, couponCode } = orderData;
+    
+    let subtotal = 0;
+    const itemsWithPrice = [];
 
     for (const item of items) {
       let product = await prisma.product.findUnique({ where: { id: item.productId } });
@@ -45,69 +26,122 @@ export class OrderService {
         if (variant) {
            product = variant.product;
         } else {
-           // Don't expose internal product IDs in error messages
-           throw new Error("One or more items in your cart are unavailable. Please refresh and try again.");
+           throw new Error("One or more items in your cart are unavailable.");
         }
       }
 
-      const targetStock = variant ? variant.inventoryQuantity : product.stock;
-      if (targetStock < item.quantity) {
-        throw new Error(`Insufficient stock for ${product.name}`);
-      }
-
       const price = variant ? Number(variant.price) : Number(product.price);
-      totalAmount += price * item.quantity;
-      orderItems.push({
+      subtotal += price * item.quantity;
+      itemsWithPrice.push({
+        ...item,
         productId: product.id,
         variantId: variant ? variant.id : undefined,
-        quantity: item.quantity,
-        price: price
+        price,
+        name: product.name,
+        image: product.image
       });
     }
 
-    // Validate coupon code BEFORE transaction (read-only check)
+    // Coupon Calculation
     let couponId: string | undefined = undefined;
-    let couponDiscountAmount = 0;
+    let discountAmount = 0;
+    let couponDetails = null;
+
     if (couponCode) {
       const coupon = await prisma.coupon.findUnique({ where: { code: couponCode as string } });
       if (coupon && coupon.expiryDate > new Date() && coupon.usedCount < coupon.usageLimit) {
         if (coupon.discountType === "PERCENTAGE") {
-          couponDiscountAmount = (totalAmount * Number(coupon.discount)) / 100;
+          discountAmount = (subtotal * Number(coupon.discount)) / 100;
         } else {
-          couponDiscountAmount = Number(coupon.discount);
+          discountAmount = Number(coupon.discount);
         }
         couponId = coupon.id;
+        couponDetails = coupon;
+      } else if (couponCode) {
+         throw new Error("Coupon is invalid, expired, or has reached its usage limit.");
       }
     }
-    // Apply coupon discount to total
-    totalAmount = Math.max(0, totalAmount - couponDiscountAmount);
 
-    // Add Tax and Shipping from settings
+    const discountedSubtotal = Math.max(0, subtotal - discountAmount);
+
+    // Tax and Shipping
     const settings = await prisma.storeSettings.findFirst();
     let taxAmount = 0;
     let shippingCost = 0;
 
     if (settings) {
       const taxRate = Number(settings.taxRate) || 0;
-      taxAmount = (totalAmount * taxRate) / 100;
+      taxAmount = (discountedSubtotal * taxRate) / 100;
       
       const shippingCharge = Number(settings.shippingCharge) || 0;
       const freeShippingThreshold = Number(settings.freeShippingThreshold) || 0;
-      shippingCost = (freeShippingThreshold > 0 && totalAmount >= freeShippingThreshold) ? 0 : shippingCharge;
+      shippingCost = (freeShippingThreshold > 0 && discountedSubtotal >= freeShippingThreshold) ? 0 : shippingCharge;
     }
 
-    totalAmount += taxAmount + shippingCost;
+    const totalAmount = discountedSubtotal + taxAmount + shippingCost;
 
-    // Create order, update stock, and increment coupon usage all in ONE atomic transaction
+    return {
+      subtotal,
+      discountAmount,
+      taxAmount,
+      shippingAmount: shippingCost,
+      totalAmount,
+      couponId,
+      couponDetails,
+      items: itemsWithPrice
+    };
+  }
+
+  static async createOrder(userId: string | undefined, email: string, orderData: any) {
+    const { shippingAddress, billingAddress, paymentMethod } = orderData;
+
+    // 1. Calculate Totals (Backend Source of Truth)
+    const totals = await this.calculateOrderTotals(orderData);
+
+    // 2. Secure user identification
+    let finalUserId = userId;
+    if (!finalUserId) {
+      let guestUser = await prisma.user.findUnique({ where: { email } });
+      if (!guestUser) {
+        const userRole = await prisma.role.findUnique({ where: { slug: "user" } });
+        const isCreatingAccount = !!orderData.password;
+        const displayName = orderData.name || (shippingAddress?.split(',')[0] || "Guest Shopper");
+        const passwordToUse = isCreatingAccount 
+          ? await bcrypt.hash(orderData.password, 10)
+          : `guest_${crypto.randomBytes(16).toString("hex")}`;
+
+        guestUser = await prisma.user.create({
+          data: {
+             email,
+             password: passwordToUse,
+             name: displayName,
+             ...(userRole ? { roleId: userRole.id } : {})
+          }
+        });
+      }
+      finalUserId = guestUser.id;
+    }
+
+    // 3. Stock Validation
+    for (const item of totals.items) {
+      const product = await prisma.product.findUnique({ where: { id: item.productId } });
+      const variant = item.variantId ? await prisma.productVariant.findUnique({ where: { id: item.variantId } }) : null;
+      const targetStock = variant ? variant.inventoryQuantity : (product?.stock || 0);
+      
+      if (targetStock < item.quantity) {
+        throw new Error(`Insufficient stock for ${item.name}`);
+      }
+    }
+
+    // 4. Create order, update stock, and increment coupon usage in transaction
     const order = await prisma.$transaction(async (tx: any) => {
-      // If coupon is used, re-validate inside transaction to prevent race conditions
-      if (couponId) {
-        const coupon = await tx.coupon.findUnique({ where: { id: couponId } });
+      if (totals.couponId) {
+        const coupon = await tx.coupon.findUnique({ where: { id: totals.couponId } });
         if (!coupon || coupon.usedCount >= coupon.usageLimit || coupon.expiryDate <= new Date()) {
-          throw new Error("Coupon is no longer valid or has reached its usage limit");
+          throw new Error("Coupon is no longer valid.");
         }
         await tx.coupon.update({
-          where: { id: couponId },
+          where: { id: totals.couponId },
           data: { usedCount: { increment: 1 } }
         });
       }
@@ -115,17 +149,17 @@ export class OrderService {
       const newOrder = await tx.order.create({
         data: {
           userId: finalUserId as string,
-          totalAmount,
-          taxAmount,
-          shippingAmount: shippingCost,
+          totalAmount: totals.totalAmount,
+          taxAmount: totals.taxAmount,
+          shippingAmount: totals.shippingAmount,
           address: shippingAddress,
           shippingAddress,
           billingAddress: billingAddress || shippingAddress,
           paymentMethod,
           status: OrderStatus.PENDING,
-          couponId,
+          couponId: totals.couponId,
           items: {
-            create: orderItems.map(oi => ({
+            create: totals.items.map(oi => ({
                productId: oi.productId,
                quantity: oi.quantity,
                price: oi.price
@@ -135,8 +169,8 @@ export class OrderService {
         include: { items: true }
       });
 
-      // Update stock atomically
-      for (const item of orderItems) {
+      // Update stock
+      for (const item of totals.items) {
         if (item.variantId) {
           await tx.productVariant.update({
             where: { id: item.variantId },
@@ -217,6 +251,10 @@ export class OrderService {
     if (!order) return null;
     const settings = await prisma.storeSettings.findFirst();
     return this.applyLegacyFallback(order, settings);
+  }
+
+  static async previewOrder(orderData: any) {
+    return await this.calculateOrderTotals(orderData);
   }
 
   private static applyLegacyFallback(order: any, settings: any) {

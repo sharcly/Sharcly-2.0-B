@@ -151,9 +151,11 @@ export const sendPasswordResetEmail = async (email: string, token: string) => {
   });
 };
 
-export const sendWelcomeCoupon = async (email: string, couponCode: string, discount: string) => {
+export const sendWelcomeCoupon = async (email: string, couponCode: string, discount: string, discountType: string = "PERCENTAGE") => {
   if (!resend) return;
   
+  const discountDisplay = discountType === "FIXED" ? `$${discount}` : `${discount}%`;
+
   await resend.emails.send({
     from: fromEmail,
     to: email,
@@ -165,7 +167,7 @@ export const sendWelcomeCoupon = async (email: string, couponCode: string, disco
       <div style="background: #f4fdf4; padding: 30px; border-radius: 15px; text-align: center; margin: 30px 0; border: 2px dashed #062D1B;">
         <p style="text-transform: uppercase; font-weight: 900; letter-spacing: 2px; color: #062D1B; margin-bottom: 10px; font-size: 12px;">Your Discount Code</p>
         <h2 style="font-size: 42px; color: #062D1B; margin: 0; letter-spacing: 4px;">${couponCode}</h2>
-        <p style="font-size: 14px; color: #062D1B; opacity: 0.6; margin-top: 10px;">Use this code for <strong>${discount}% OFF</strong> your first order.</p>
+        <p style="font-size: 14px; color: #062D1B; opacity: 0.6; margin-top: 10px;">Use this code for <strong>${discountDisplay} OFF</strong> your first order.</p>
       </div>
       `,
       { text: "Shop Our Collection", url: `${process.env.FRONTEND_URL}/products` }

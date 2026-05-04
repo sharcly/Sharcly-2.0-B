@@ -233,14 +233,36 @@ export const CreateRegionSchema = z.object({
 // MARKETING SCHEMAS
 // ─────────────────────────────────────────────────────
 export const MarketingOfferSchema = z.object({
-  title: z.string().min(3).max(200),
-  description: z.string().min(10),
-  discount: z.number().positive(),
-  isActive: z.boolean().default(true),
+  title: z.string().min(1, "Title is required").max(200),
+  subtitle: z.string().max(200).optional().nullable().transform(v => v === "" ? null : v),
+  description: z.string().min(1, "Description is required"),
+  discount: z
+    .union([z.string(), z.number()])
+    .transform((val) => {
+      const parsed = parseFloat(String(val));
+      return isNaN(parsed) ? 0 : parsed;
+    })
+    .refine((val) => val > 0, "Discount must be a positive number"),
+  discountType: z.enum(["FIXED", "PERCENTAGE"]).default("FIXED"),
+  image: z.string().optional().nullable().transform(v => v === "" ? null : v),
+  options: z.union([z.string(), z.array(z.any())]).optional().transform((val) => {
+    if (!val) return [];
+    if (typeof val === 'string') {
+      try { return JSON.parse(val); } catch (e) { return []; }
+    }
+    return val;
+  }),
+  step2Title: z.string().max(200).optional().nullable().transform(v => v === "" ? null : v),
+  step2Text: z.string().max(500).optional().nullable().transform(v => v === "" ? null : v),
+  footerText: z.string().max(100).optional().nullable().transform(v => v === "" ? null : v),
+  isActive: z
+    .union([z.boolean(), z.string()])
+    .transform((val) => val === true || val === "true" || val === "1")
+    .default(true),
 });
 
 export const ClaimOfferSchema = z.object({
-  welcomeOfferId: z.string().uuid(),
+  offerId: z.string().uuid(),
   email: z.string().email(),
   phone: z.string().min(8),
 });

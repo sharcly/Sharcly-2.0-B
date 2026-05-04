@@ -22,7 +22,16 @@ export class MarketingController {
 
   static async createOffer(req: Request, res: Response) {
     try {
-      const offer = await MarketingService.createOffer(req.body);
+      const data = { ...req.body };
+      
+      // Handle file upload
+      const files = req.files as Express.Multer.File[];
+      const imageFile = files?.find(f => f.fieldname === "image");
+      if (imageFile) {
+        data.image = imageFile.filename;
+      }
+
+      const offer = await MarketingService.createOffer(data);
       res.status(201).json(offer);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -31,7 +40,16 @@ export class MarketingController {
 
   static async updateOffer(req: Request, res: Response) {
     try {
-      const offer = await MarketingService.updateOffer(req.params.id as string, req.body);
+      const data = { ...req.body };
+
+      // Handle file upload
+      const files = req.files as Express.Multer.File[];
+      const imageFile = files?.find(f => f.fieldname === "image");
+      if (imageFile) {
+        data.image = imageFile.filename;
+      }
+
+      const offer = await MarketingService.updateOffer(req.params.id as string, data);
       res.json(offer);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
