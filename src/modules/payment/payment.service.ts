@@ -1,7 +1,7 @@
 import Stripe from "stripe";
 import { prisma } from "../../common/lib/prisma";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2025-01-27-acacia" as any,
 });
 
@@ -59,5 +59,13 @@ export class PaymentService {
     }
 
     return await stripe.paymentMethods.detach(pmId);
+  }
+
+  static async createPaymentIntent(amount: number, currency: string = "usd", metadata: any = {}) {
+    return await stripe.paymentIntents.create({
+      amount: Math.round(amount * 100), // Stripe expects cents
+      currency,
+      metadata,
+    });
   }
 }
