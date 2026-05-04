@@ -308,4 +308,40 @@ export class OrderService {
 
     return updatedOrder;
   }
+
+  static async cancelOrder(id: string, userId: string, cancelReason: string) {
+    const order = await prisma.order.findUnique({
+      where: { id },
+      include: { items: true }
+    });
+
+    if (!order) throw new Error("Order not found");
+    if (order.userId !== userId) throw new Error("Access denied");
+    if (order.status !== OrderStatus.PENDING) {
+      throw new Error(`Order cannot be cancelled because it is already ${order.status.toLowerCase()}.`);
+    }
+
+    return await prisma.$transaction(async (tx: any) => {
+      const updatedOrder = await tx.order.update({
+        where: { id },
+        data: { 
+          status: OrderStatus.CANCELLED,
+          cancelReason
+        }
+      });
+
+      // Restore stock
+      for (const item of order.items) {
+        // We need to check if it was a variant or base product
+        // OrderItem only has productId. In a better schema we'd have variantId in OrderItem.
+        // For now, let's look at the product stock.
+        await tx.product.update({
+          where: { id: item.productId },
+          data: { stock: { increment: item.quantity } }
+        });
+      }
+
+      return updatedOrder;
+    });
+  }
 }

@@ -106,3 +106,19 @@ export const downloadInvoice = async (req: any, res: Response) => {
     res.status(500).json({ message: "Failed to generate invoice" });
   }
 };
+
+export const cancelOrder = async (req: any, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+    
+    if (!reason) {
+      return res.status(400).json({ message: "Cancellation reason is required" });
+    }
+
+    const order = await OrderService.cancelOrder(id, req.user.id, reason);
+    res.status(200).json({ success: true, order });
+  } catch (error: any) {
+    res.status(400).json({ message: error.message || "Failed to cancel order" });
+  }
+};

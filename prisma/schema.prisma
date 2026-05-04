@@ -188,6 +188,7 @@ model Order {
   carrier           String?
   estimatedDelivery DateTime?
   notes             String?
+  cancelReason      String?
   createdAt         DateTime    @default(now())
   updatedAt         DateTime    @updatedAt
   items             OrderItem[]
