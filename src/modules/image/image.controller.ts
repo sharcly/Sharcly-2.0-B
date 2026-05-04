@@ -34,10 +34,11 @@ export const getImage = async (req: Request, res: Response) => {
     }
 
     if (!image || !image.data) {
+      console.log(`[ImageServer] 404: Image ${id} not found in database`);
       return res.status(404).json({ message: "Image not found" });
     }
 
-    console.log(`[ImageServer] Streaming asset ${id} (${image.mimeType})`);
+    console.log(`[ImageServer] Streaming asset ${id} (${image.mimeType}) - Size: ${image.data.length} bytes`);
 
     // Set binary headers for cinematic delivery with CORP relaxation
     res.setHeader("Content-Type", image.mimeType || "image/jpeg");
@@ -46,7 +47,7 @@ export const getImage = async (req: Request, res: Response) => {
     
     return res.send(image.data);
   } catch (error) {
-    console.error("[ImageServer] Stream failure:", error);
+    console.error("[ImageServer] Stream failure for ID:", req.params.id, error);
     res.status(500).json({ message: "Internal server error" });
   }
 };

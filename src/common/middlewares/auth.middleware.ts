@@ -42,7 +42,7 @@ export const authenticate = async (
   try {
     const token = extractToken(req);
     if (!token) {
-      console.warn(`[AUTH] 401: Token missing for ${req.method} ${req.originalUrl} from ${req.headers.origin || 'no origin'}`);
+      console.warn(`[AUTH] 401: Token missing for ${req.method} ${req.originalUrl} from origin: ${req.headers.origin || 'none'}`);
       return res.status(401).json({ message: "Authentication required" });
     }
 
@@ -67,6 +67,7 @@ export const authenticate = async (
     });
 
     if (!user) {
+      console.warn(`[AUTH] 401: User not found for ID ${decoded.id}`);
       return res.status(401).json({ message: "User not found" });
     }
 
@@ -76,7 +77,8 @@ export const authenticate = async (
 
     req.user = user as any;
     next();
-  } catch (error) {
+  } catch (error: any) {
+    console.error(`[AUTH] 401: Token verification failed: ${error.message}`);
     return res.status(401).json({ message: "Invalid or expired token" });
   }
 };
@@ -119,8 +121,8 @@ export const authorize = (...requiredPermissions: string[]) => {
       return res.status(401).json({ message: "Authentication required" });
     }
 
-    // Admin superuser check - if role slug is 'admin', grant all
-    if (req.user.userRole?.slug === 'admin') {
+    // Admin superuser check - if role slug is 'admin' or 'super_admin', grant all
+    if (req.user.userRole?.slug === 'admin' || req.user.userRole?.slug === 'super_admin') {
       return next();
     }
 

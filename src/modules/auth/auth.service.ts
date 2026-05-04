@@ -2,7 +2,7 @@ import { prisma } from "../../common/lib/prisma";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
-import { sendVerificationEmail, sendOtpEmail } from "./email.service";
+import { sendVerificationEmail, sendOtpEmail, sendPasswordResetEmail } from "./email.service";
 
 const ACCESS_TOKEN_SECRET = process.env.JWT_SECRET!;
 const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET!;
@@ -143,7 +143,15 @@ export class AuthService {
     const user = await prisma.user.findUnique({ 
       where: { email },
       include: { 
-        userRole: true
+        userRole: {
+          include: {
+            permissions: {
+              include: {
+                permission: true
+              }
+            }
+          }
+        }
       }
     });
 
@@ -162,6 +170,7 @@ export class AuthService {
     }
 
     const roleSlug = user.userRole?.slug || "user";
+    const permissions = user.userRole?.permissions.map(p => p.permission.slug) || [];
     
     let tokens;
     try {
@@ -178,6 +187,7 @@ export class AuthService {
         email: user.email,
         name: user.name,
         role: roleSlug,
+        permissions
       }
     };
   }
@@ -215,7 +225,15 @@ export class AuthService {
       where: { id: userId },
       include: { 
         addresses: true,
-        userRole: true
+        userRole: {
+          include: {
+            permissions: {
+              include: {
+                permission: true
+              }
+            }
+          }
+        }
       }
     });
 
@@ -224,7 +242,12 @@ export class AuthService {
     }
 
     const { password: _, refreshToken: __, verificationToken: ___, ...userWithoutSensitiveData } = user;
-    return userWithoutSensitiveData;
+    const permissions = user.userRole?.permissions.map(p => p.permission.slug) || [];
+    
+    return {
+      ...userWithoutSensitiveData,
+      permissions
+    };
   }
 
   static async changePassword(userId: string, data: any) {
@@ -256,7 +279,11 @@ export class AuthService {
     }
 
     const resetToken = jwt.sign(
-      { id: user.id, purpose: "password_reset" },
+      { 
+        id: user.id, 
+        purpose: "password_reset",
+        version: user.password.slice(-10) // One-time use trick
+      },
       ACCESS_TOKEN_SECRET,
       { expiresIn: "7h" }
     );
@@ -276,10 +303,18 @@ export class AuthService {
       throw new Error("Invalid token purpose");
     }
 
+    const user = await prisma.user.findUnique({ where: { id: payload.id } });
+    if (!user || user.password.slice(-10) !== payload.version) {
+      throw new Error("This reset link has already been used or is invalid.");
+    }
+
     const hashedPassword = await bcrypt.hash(newPassword, 10);
     await prisma.user.update({
       where: { id: payload.id },
-      data: { password: hashedPassword }
+      data: { 
+        password: hashedPassword,
+        refreshToken: null // Logout from all devices on password reset
+      }
     });
   }
 
