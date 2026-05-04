@@ -9,7 +9,7 @@ if (!apiKey || apiKey === "re_...") {
 }
 
 const resend = apiKey && apiKey !== "re_..." ? new Resend(apiKey) : null;
-const fromEmail = "Sharcly <onboarding@resend.dev>";
+const fromEmail = process.env.RESEND_FROM_EMAIL || "Sharcly <onboarding@resend.dev>";
 const logoUrl = "https://cdn.mignite.app/ws/works_01KM0WR2ZSKYNHV0ZE2MPNM9EF/final-Logo-1--01KM5Y2NCW8720B30G9G0XW18Y.png";
 
 const baseTemplate = (title: string, content: string, cta?: { text: string; url: string }, footer?: string) => `
@@ -42,20 +42,33 @@ const baseTemplate = (title: string, content: string, cta?: { text: string; url:
 `;
 
 export const sendVerificationEmail = async (email: string, token: string) => {
-  if (!resend) return;
+  if (!resend) {
+    console.error("❌ Resend client not initialized. Cannot send verification email to:", email);
+    return;
+  }
   const verificationUrl = `${process.env.FRONTEND_URL}/verify-email?token=${token}`;
   
-  await resend.emails.send({
-    from: fromEmail,
-    to: email,
-    subject: "Verify your email - Sharcly",
-    html: baseTemplate(
-      "Welcome to Sharcly!",
-      "Thank you for joining us. Please verify your email address to get full access to your account and start shopping our premium collection.",
-      { text: "Verify Email Address", url: verificationUrl },
-      "If you didn't create an account, you can safely ignore this email."
-    ),
-  });
+  try {
+    const { data, error } = await resend.emails.send({
+      from: fromEmail,
+      to: email,
+      subject: "Verify your email - Sharcly",
+      html: baseTemplate(
+        "Welcome to Sharcly!",
+        "Thank you for joining us. Please verify your email address to get full access to your account and start shopping our premium collection.",
+        { text: "Verify Email Address", url: verificationUrl },
+        "If you didn't create an account, you can safely ignore this email."
+      ),
+    });
+
+    if (error) {
+      console.error("❌ Resend API Error while sending verification email:", error);
+    } else {
+      console.log(`✅ Verification Email sent successfully to ${email}. ID: ${data?.id}`);
+    }
+  } catch (err) {
+    console.error("❌ Unexpected Error in sendVerificationEmail:", err);
+  }
 };
 
 export const sendOrderConfirmation = async (email: string, orderDetails: any) => {
@@ -176,24 +189,37 @@ export const sendWelcomeCoupon = async (email: string, couponCode: string, disco
 };
 
 export const sendOtpEmail = async (email: string, otp: string) => {
-  if (!resend) return;
+  if (!resend) {
+    console.error("❌ Resend client not initialized. Cannot send OTP to:", email);
+    return;
+  }
   
-  await resend.emails.send({
-    from: fromEmail,
-    to: email,
-    subject: `Verification Code: ${otp} - Sharcly`,
-    html: baseTemplate(
-      "Verify Your Email",
-      `
-      <p>Use the following security code to complete your registration. For your security, please do not share this code with anyone.</p>
-      <div style="background: #f4fdf4; padding: 32px; border-radius: 20px; text-align: center; margin: 24px 0;">
-        <h2 style="font-size: 48px; letter-spacing: 12px; color: #062D1B; margin: 0; font-weight: 800;">${otp}</h2>
-        <p style="font-size: 13px; color: #062D1B; opacity: 0.6; margin-top: 12px; font-weight: 600;">Valid for 10 minutes</p>
-      </div>
-      `,
-      undefined,
-      "If you didn't request this code, please ignore this email."
-    ),
-  });
+  try {
+    const { data, error } = await resend.emails.send({
+      from: fromEmail,
+      to: email,
+      subject: `Verification Code: ${otp} - Sharcly`,
+      html: baseTemplate(
+        "Verify Your Email",
+        `
+        <p>Use the following security code to complete your registration. For your security, please do not share this code with anyone.</p>
+        <div style="background: #f4fdf4; padding: 32px; border-radius: 20px; text-align: center; margin: 24px 0;">
+          <h2 style="font-size: 48px; letter-spacing: 12px; color: #062D1B; margin: 0; font-weight: 800;">${otp}</h2>
+          <p style="font-size: 13px; color: #062D1B; opacity: 0.6; margin-top: 12px; font-weight: 600;">Valid for 10 minutes</p>
+        </div>
+        `,
+        undefined,
+        "If you didn't request this code, please ignore this email."
+      ),
+    });
+
+    if (error) {
+      console.error("❌ Resend API Error while sending OTP:", error);
+    } else {
+      console.log(`✅ OTP Email sent successfully to ${email}. ID: ${data?.id}`);
+    }
+  } catch (err) {
+    console.error("❌ Unexpected Error in sendOtpEmail:", err);
+  }
 };
 

@@ -48,7 +48,7 @@ export const handleStripeWebhook = async (req: Request, res: Response) => {
       try {
         await prisma.order.update({
           where: { id: orderId },
-          data: { status: OrderStatus.COMPLETED } // Mark as completed or paid
+          data: { status: OrderStatus.CONFIRMED } // Mark as confirmed/paid
         });
         console.log(`[STRIPE] Order ${orderId} marked as PAID`);
       } catch (error) {

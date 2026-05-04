@@ -128,4 +128,52 @@ export class MarketingService {
       orderBy: { createdAt: "desc" }
     });
   }
+
+  static async subscribeNewsletter(email: string) {
+    // 1. Check if already subscribed in local DB
+    const existingSubscriber = await prisma.newsletterSubscriber.findUnique({
+      where: { email }
+    });
+
+    if (existingSubscriber) {
+      if (existingSubscriber.isActive) {
+        throw new Error("You are already subscribed to our newsletter.");
+      } else {
+        // Reactivate
+        await prisma.newsletterSubscriber.update({
+          where: { email },
+          data: { isActive: true }
+        });
+      }
+    } else {
+      // Create new subscriber
+      await prisma.newsletterSubscriber.create({
+        data: { email }
+      });
+    }
+
+    // 2. Klaviyo Sync
+    try {
+      const seoSettings = await SeoService.getGlobalSettings();
+      KlaviyoService.init(seoSettings?.klaviyoPrivateKey);
+      
+      // Add to list
+      await KlaviyoService.subscribeToList(email);
+      
+      // Track event
+      await KlaviyoService.trackEvent(email, "Subscribed to Newsletter", {
+        "Source": "Footer Community Form"
+      });
+    } catch (kErr) {
+      console.warn("Klaviyo Newsletter Sync Failed:", kErr);
+    }
+
+    return { email, success: true };
+  }
+
+  static async getSubscribers() {
+    return await prisma.newsletterSubscriber.findMany({
+      orderBy: { createdAt: "desc" }
+    });
+  }
 }

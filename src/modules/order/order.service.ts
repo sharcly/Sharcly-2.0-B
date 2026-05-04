@@ -332,7 +332,7 @@ export class OrderService {
 
     if (!order) throw new Error("Order not found");
     if (order.userId !== userId) throw new Error("Access denied");
-    if (order.status !== OrderStatus.PENDING) {
+    if (![OrderStatus.PENDING, OrderStatus.CONFIRMED].includes(order.status)) {
       throw new Error(`Order cannot be cancelled because it is already ${order.status.toLowerCase()}.`);
     }
 
