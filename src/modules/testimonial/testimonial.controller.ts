@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import { TestimonialService } from "./testimonial.service";
 
+
 export class TestimonialController {
   static async getAll(req: Request, res: Response) {
     try {
@@ -30,7 +31,7 @@ export class TestimonialController {
   static async create(req: Request, res: Response) {
     try {
       const testimonial = await TestimonialService.create(req.body);
-      res.status(21).json({ success: true, data: testimonial });
+      res.status(201).json({ success: true, data: testimonial });
     } catch (error: any) {
       res.status(500).json({ success: false, message: error.message });
     }
