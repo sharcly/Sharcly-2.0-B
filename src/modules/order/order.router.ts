@@ -5,7 +5,9 @@ import {
   getAllOrders, 
   getOrderById,
   updateOrderStatus,
-  downloadInvoice
+  downloadInvoice,
+  previewOrder,
+  cancelOrder
 } from "./order.controller";
 import { authenticate, authorize, optionalAuth } from "../../common/middlewares/auth.middleware";
 import { validate, CreateOrderSchema, UpdateOrderStatusSchema } from "../../common/middlewares/validate.middleware";
@@ -43,6 +45,7 @@ const router = Router();
  *         description: Unauthorized
  */
 router.post("/", optionalAuth, validate(CreateOrderSchema), createOrder);
+router.post("/preview", optionalAuth, previewOrder);
 
 /**
  * @swagger
@@ -136,5 +139,6 @@ router.patch("/:id/status", authenticate, authorize("orders.manage"), validate(U
  *       - bearerAuth: []
  */
 router.get("/:id/invoice", authenticate, downloadInvoice);
+router.post("/:id/cancel", authenticate, cancelOrder);
 
 export default router;

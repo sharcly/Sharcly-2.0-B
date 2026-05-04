@@ -12,10 +12,13 @@ export const csrfProtection = (req: Request, res: Response, next: NextFunction) 
   if (!csrfToken) {
     csrfToken = crypto.randomBytes(32).toString("hex");
     // Set cookie that the frontend can read
+    const isProd = process.env.NODE_ENV === "production";
+    const isSecure = req.secure || req.headers["x-forwarded-proto"] === "https";
+
     res.cookie("XSRF-TOKEN", csrfToken, {
       httpOnly: false, // Must be accessible by JS
-      secure: true,
-      sameSite: "none",
+      secure: isSecure, 
+      sameSite: isSecure ? "none" : "lax",
       path: "/",
       maxAge: 24 * 60 * 60 * 1000,
     });
@@ -24,11 +27,28 @@ export const csrfProtection = (req: Request, res: Response, next: NextFunction) 
   // Attach to locals for response body usage
   res.locals.csrfToken = csrfToken;
 
-  // 2. Skip validation for safe methods AND specific routes like login/register
+  // 2. Skip validation for safe methods OR specific public routes
   const safeMethods = ["GET", "HEAD", "OPTIONS"];
-  const skipRoutes = ["/api/auth/login", "/api/auth/register", "/api/auth/send-otp"]; 
+  const skipRoutes = [
+    "/api/auth/login",
+    "/api/auth/register",
+    "/api/auth/send-otp",
+    "/api/auth/forgot-password",
+    "/api/auth/reset-password",
+    "/api/auth/refresh-token",
+    "/api/wholesale/inquiries",
+    "/api/shipping/calculate",
+    "/api/coupon/validate",
+    "/api/marketing/subscribe"
+  ]; 
   
-  if (safeMethods.includes(req.method) || skipRoutes.some(route => req.originalUrl.includes(route))) {
+  const isSafeMethod = safeMethods.includes(req.method);
+  const isSkippedRoute = skipRoutes.some(route => req.originalUrl.includes(route));
+  
+  // Also skip if no auth cookies are present (nothing to hijack)
+  const hasAuthCookies = req.cookies["access_token"] || req.cookies["refresh_token"];
+  
+  if (isSafeMethod || isSkippedRoute || !hasAuthCookies) {
     return next();
   }
 

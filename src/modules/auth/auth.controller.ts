@@ -1,11 +1,14 @@
 import { Request, Response } from "express";
 import { AuthService } from "./auth.service";
 
-const COOKIE_OPTIONS = {
-  httpOnly: true,
-  secure: true, // Required for SameSite=None
-  sameSite: "none" as const, // Support cross-domain cookies
-  path: "/",
+const getCookieOptions = (req: Request) => {
+  const isSecure = req.secure || req.headers["x-forwarded-proto"] === "https";
+  return {
+    httpOnly: true,
+    secure: isSecure,
+    sameSite: isSecure ? ("none" as const) : ("lax" as const),
+    path: "/",
+  };
 };
 
 export const register = async (req: Request, res: Response) => {
@@ -13,13 +16,13 @@ export const register = async (req: Request, res: Response) => {
     const { email, password, name, otp } = req.body;
     const result = await AuthService.register({ email, password, name, otp });
 
-    // Set httpOnly cookies
+    const cookieOptions = getCookieOptions(req);
     res.cookie("access_token", result.tokens.accessToken, {
-      ...COOKIE_OPTIONS,
+      ...cookieOptions,
       maxAge: 24 * 60 * 60 * 1000, // 24h
     });
     res.cookie("refresh_token", result.tokens.refreshToken, {
-      ...COOKIE_OPTIONS,
+      ...cookieOptions,
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7d
     });
 
@@ -63,13 +66,13 @@ export const login = async (req: Request, res: Response) => {
     const { email, password } = req.body;
     const result = await AuthService.login({ email, password });
 
-    // Set httpOnly cookies (not accessible by JavaScript — XSS safe)
+    const cookieOptions = getCookieOptions(req);
     res.cookie("access_token", result.tokens.accessToken, {
-      ...COOKIE_OPTIONS,
+      ...cookieOptions,
       maxAge: 24 * 60 * 60 * 1000, // 24h
     });
     res.cookie("refresh_token", result.tokens.refreshToken, {
-      ...COOKIE_OPTIONS,
+      ...cookieOptions,
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7d
     });
 
@@ -86,21 +89,28 @@ export const login = async (req: Request, res: Response) => {
 
 export const refreshTokens = async (req: Request, res: Response) => {
   try {
-    // Accept refresh token from body OR from httpOnly cookie
-    const refreshToken = req.body.refreshToken || (req as any).cookies?.refresh_token;
+    const bodyToken = req.body.refreshToken;
+    const cookieToken = (req as any).cookies?.refresh_token;
+    
+    const refreshToken = bodyToken || cookieToken;
+
     if (!refreshToken) {
-      return res.status(400).json({ message: "Refresh token is required" });
+      console.warn("[Auth] Refresh token missing. Body:", !!bodyToken, "Cookie:", !!cookieToken);
+      return res.status(400).json({ 
+        success: false,
+        message: "Refresh token is required" 
+      });
     }
 
     const tokens = await AuthService.refreshTokens(refreshToken);
 
-    // Update cookies with new tokens
+    const cookieOptions = getCookieOptions(req);
     res.cookie("access_token", tokens.accessToken, {
-      ...COOKIE_OPTIONS,
+      ...cookieOptions,
       maxAge: 24 * 60 * 60 * 1000,
     });
     res.cookie("refresh_token", tokens.refreshToken, {
-      ...COOKIE_OPTIONS,
+      ...cookieOptions,
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
@@ -109,7 +119,11 @@ export const refreshTokens = async (req: Request, res: Response) => {
       ...tokens
     });
   } catch (error: any) {
-    res.status(401).json({ message: error.message || "Token refresh failed" });
+    console.error("[Auth] Refresh token failed:", error.message);
+    res.status(401).json({ 
+      success: false,
+      message: error.message || "Token refresh failed" 
+    });
   }
 };
 
@@ -118,8 +132,9 @@ export const logout = async (req: any, res: Response) => {
     await AuthService.logout(req.user.id);
 
     // Clear httpOnly cookies
-    res.clearCookie("access_token", { ...COOKIE_OPTIONS });
-    res.clearCookie("refresh_token", { ...COOKIE_OPTIONS });
+    const cookieOptions = getCookieOptions(req);
+    res.clearCookie("access_token", { ...cookieOptions });
+    res.clearCookie("refresh_token", { ...cookieOptions });
 
     res.status(200).json({ success: true, message: "Logged out successfully" });
   } catch (error: any) {
@@ -182,8 +197,9 @@ export const deactivateAccount = async (req: any, res: Response) => {
     await AuthService.deactivateAccount(req.user.id);
     
     // Clear cookies
-    res.clearCookie("access_token", { ...COOKIE_OPTIONS });
-    res.clearCookie("refresh_token", { ...COOKIE_OPTIONS });
+    const cookieOptions = getCookieOptions(req);
+    res.clearCookie("access_token", { ...cookieOptions });
+    res.clearCookie("refresh_token", { ...cookieOptions });
 
     res.status(200).json({ success: true, message: "Account deactivated successfully" });
   } catch (error: any) {
