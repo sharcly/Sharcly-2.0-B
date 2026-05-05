@@ -9,6 +9,7 @@ const router = Router();
 // Public routes
 router.get("/active-offers", MarketingController.getActiveOffers);
 router.post("/claim-offer", validate(ClaimOfferSchema), MarketingController.claimOffer);
+router.post("/subscribe", MarketingController.subscribeNewsletter);
 
 // Admin routes
 router.get("/offers", authenticate, authorize("admin", "manager"), MarketingController.getAllOffers);
@@ -16,5 +17,6 @@ router.post("/offers", authenticate, authorize("admin", "manager"), upload.any()
 router.put("/offers/:id", authenticate, authorize("admin", "manager"), upload.any(), validate(MarketingOfferSchema), MarketingController.updateOffer);
 router.delete("/offers/:id", authenticate, authorize("admin", "manager"), MarketingController.deleteOffer);
 router.get("/claims", authenticate, authorize("admin", "manager"), MarketingController.getClaims);
+router.get("/subscribers", authenticate, authorize("admin", "manager"), MarketingController.getSubscribers);
 
 export default router;
