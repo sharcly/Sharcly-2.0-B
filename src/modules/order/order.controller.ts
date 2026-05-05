@@ -59,7 +59,7 @@ export const getOrderById = async (req: any, res: Response) => {
     }
 
     // IDOR fix: only allow owner or admin/manager to view order
-    const isAdmin = ["admin", "manager"].includes(req.user?.userRole?.slug);
+    const isAdmin = ["admin", "super_admin", "manager"].includes(req.user?.userRole?.slug);
     if (!isAdmin && order.userId !== req.user?.id) {
       return res.status(403).json({ message: "Access denied" });
     }
@@ -92,7 +92,7 @@ export const downloadInvoice = async (req: any, res: Response) => {
     }
 
     // IDOR fix: only allow owner or admin/manager to view order
-    const isAdmin = ["admin", "manager"].includes(req.user?.userRole?.slug);
+    const isAdmin = ["admin", "super_admin", "manager"].includes(req.user?.userRole?.slug);
     if (!isAdmin && order.userId !== req.user?.id) {
       return res.status(403).json({ message: "Access denied" });
     }

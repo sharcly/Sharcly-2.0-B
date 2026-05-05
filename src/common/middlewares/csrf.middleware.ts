@@ -27,6 +27,15 @@ export const csrfProtection = (req: Request, res: Response, next: NextFunction) 
   // Attach to locals for response body usage
   res.locals.csrfToken = csrfToken;
 
+  // 1.5. Inject CSRF token into JSON responses (for cross-domain accessibility)
+  const originalJson = res.json;
+  res.json = function (body: any) {
+    if (body && typeof body === "object" && !body.csrfToken && res.locals.csrfToken) {
+      body.csrfToken = res.locals.csrfToken;
+    }
+    return originalJson.call(this, body);
+  };
+
   // 2. Skip validation for safe methods OR specific public routes
   const safeMethods = ["GET", "HEAD", "OPTIONS"];
   const skipRoutes = [
