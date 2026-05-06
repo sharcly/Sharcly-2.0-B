@@ -8,5 +8,7 @@ const router = (0, express_1.Router)();
 router.use(auth_middleware_1.authenticate);
 router.post("/", (0, validate_middleware_1.validate)(validate_middleware_1.CreateAddressSchema), address_controller_1.createAddress);
 router.get("/", address_controller_1.getAddresses);
+router.put("/:id", (0, validate_middleware_1.validate)(validate_middleware_1.CreateAddressSchema), address_controller_1.updateAddress);
+router.patch("/:id/default", address_controller_1.setDefaultAddress);
 router.delete("/:id", address_controller_1.deleteAddress);
 exports.default = router;

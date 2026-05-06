@@ -29,6 +29,35 @@ class AddressService {
             orderBy: { createdAt: "desc" }
         });
     }
+    static async update(id, userId, data) {
+        if (data.isDefault) {
+            await prisma_1.prisma.address.updateMany({
+                where: { userId },
+                data: { isDefault: false }
+            });
+        }
+        return await prisma_1.prisma.address.update({
+            where: { id, userId },
+            data: {
+                street: data.street,
+                city: data.city,
+                state: data.state,
+                zipCode: data.zipCode,
+                country: data.country,
+                isDefault: data.isDefault
+            }
+        });
+    }
+    static async toggleDefault(id, userId) {
+        await prisma_1.prisma.address.updateMany({
+            where: { userId },
+            data: { isDefault: false }
+        });
+        return await prisma_1.prisma.address.update({
+            where: { id, userId },
+            data: { isDefault: true }
+        });
+    }
     static async delete(id, userId) {
         return await prisma_1.prisma.address.delete({
             where: { id, userId }
