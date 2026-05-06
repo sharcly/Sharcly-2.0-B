@@ -5,11 +5,13 @@ const prisma_1 = require("../../common/lib/prisma");
 const product_service_1 = require("./product.service");
 const getProducts = async (req, res) => {
     try {
-        const { category, search, sort, page = "1", limit = "10" } = req.query;
+        const { category, search, sort, page = "1", limit = "10", featured } = req.query;
         const pageNum = parseInt(page);
         const limitNum = parseInt(limit);
         const skip = (pageNum - 1) * limitNum;
         const where = {};
+        if (featured === "true")
+            where.featured = true;
         if (category)
             where.category = { slug: category };
         if (search)
@@ -91,7 +93,7 @@ const getProductBySlug = async (req, res) => {
 exports.getProductBySlug = getProductBySlug;
 const createProduct = async (req, res) => {
     try {
-        const { name, subtitle, slug, sku, description, price, stock, categoryId, typeId, tags, collections, status, discountable, weight, length, height, width, originCountry, material, hsCode, midCode, metaTitle, metaDescription, keywords, canonicalUrl, ogImage, changefreq, options, metadata, variants } = req.body;
+        const { name, subtitle, slug, sku, description, price, stock, categoryId, typeId, tags, collections, status, discountable, weight, length, height, width, originCountry, material, hsCode, midCode, metaTitle, metaDescription, keywords, canonicalUrl, ogImage, changefreq, options, metadata, variants, featured } = req.body;
         if (!categoryId) {
             return res.status(400).json({ message: "Category is required" });
         }
@@ -161,11 +163,11 @@ const createProduct = async (req, res) => {
                 name,
                 subtitle,
                 slug: finalSlug,
-                sku,
+                sku: sku || null,
                 description,
                 status: status || "DRAFT",
-                price: parseFloat(price || "0"),
-                stock: parseInt(stock || "0"),
+                price: (price !== undefined && price !== "" && price !== "null") ? parseFloat(price) : 0,
+                stock: (stock !== undefined && stock !== "" && stock !== "null") ? parseInt(stock) : 0,
                 categoryId: categoryId,
                 typeId: (typeId && typeId !== "") ? typeId : null,
                 weight: (weight && weight !== "null" && weight !== "") ? parseFloat(weight) : null,
@@ -184,6 +186,7 @@ const createProduct = async (req, res) => {
                 changefreq: changefreq || "monthly",
                 options: optionsData,
                 metadata: metadataData,
+                featured: featured === "true" || featured === true,
                 discountable: discountable === "true" || discountable === true,
                 collections: collections && Array.isArray(collections) ? {
                     connect: collections.map((id) => ({ id }))
@@ -199,7 +202,7 @@ const createProduct = async (req, res) => {
                 variants: {
                     create: variantData.map((v, idx) => ({
                         title: v.title,
-                        sku: v.sku,
+                        sku: v.sku || null,
                         price: parseFloat(v.price || v.prices?.[0]?.amount || v.price || 0),
                         inventoryQuantity: parseInt(v.inventoryQuantity || v.stock || 0),
                         manageInventory: v.manageInventory === "true" || v.manageInventory === true || v.manageInventory === undefined,
@@ -256,7 +259,7 @@ exports.createProduct = createProduct;
 const updateProduct = async (req, res) => {
     try {
         const { id } = req.params;
-        const { name, subtitle, slug, sku, description, price, stock, categoryId, typeId, tags, collections, status, discountable, weight, length, height, width, originCountry, material, hsCode, midCode, metaTitle, metaDescription, keywords, canonicalUrl, ogImage, changefreq, options, metadata, variants } = req.body;
+        const { name, subtitle, slug, sku, description, price, stock, categoryId, typeId, tags, collections, status, discountable, weight, length, height, width, originCountry, material, hsCode, midCode, metaTitle, metaDescription, keywords, canonicalUrl, ogImage, changefreq, options, metadata, variants, featured } = req.body;
         const tagsArray = tags ? (Array.isArray(tags) ? tags : (typeof tags === "string" ? JSON.parse(tags) : [])) : undefined;
         const variantData = variants ? (typeof variants === "string" ? JSON.parse(variants) : variants) : undefined;
         const optionsData = options ? (typeof options === "string" ? JSON.parse(options) : options) : undefined;
@@ -299,11 +302,11 @@ const updateProduct = async (req, res) => {
                 name,
                 subtitle,
                 slug,
-                sku,
+                sku: sku || null,
                 description,
                 status,
-                price: price !== undefined ? parseFloat(price) : undefined,
-                stock: stock !== undefined ? parseInt(stock) : undefined,
+                price: (price !== undefined && price !== "" && price !== "null") ? parseFloat(price) : undefined,
+                stock: (stock !== undefined && stock !== "" && stock !== "null") ? parseInt(stock) : undefined,
                 categoryId: categoryId ? categoryId : undefined,
                 typeId: (typeId && typeId !== "") ? typeId : (typeId === null ? null : undefined),
                 weight: weight !== undefined && weight !== "" ? parseFloat(weight) : undefined,
@@ -322,6 +325,7 @@ const updateProduct = async (req, res) => {
                 changefreq,
                 options: optionsData,
                 metadata: metadataData,
+                featured: featured === "true" || featured === true || (featured === "false" || featured === false ? false : undefined),
                 discountable: discountable === "true" || discountable === true,
                 collections: collections && Array.isArray(collections) ? {
                     set: collections.map((id) => ({ id }))
@@ -339,7 +343,7 @@ const updateProduct = async (req, res) => {
                     deleteMany: {},
                     create: variantData.map((v) => ({
                         title: v.title,
-                        sku: v.sku,
+                        sku: v.sku || null,
                         price: parseFloat(v.price || 0),
                         inventoryQuantity: parseInt(v.inventoryQuantity || v.stock || 0),
                         manageInventory: v.manageInventory === "true" || v.manageInventory === true || v.manageInventory === undefined,

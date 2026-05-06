@@ -6,7 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.authorize = exports.optionalAuth = exports.authenticate = void 0;
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const prisma_1 = require("../lib/prisma");
-const ACCESS_TOKEN_SECRET = process.env.JWT_SECRET || "fallback_access_secret";
+const ACCESS_TOKEN_SECRET = process.env.JWT_SECRET;
 // Helper to extract token from Bearer header OR httpOnly cookie
 function extractToken(req) {
     const authHeader = req.headers.authorization;
@@ -23,6 +23,7 @@ const authenticate = async (req, res, next) => {
     try {
         const token = extractToken(req);
         if (!token) {
+            console.warn(`[AUTH] 401: Token missing for ${req.method} ${req.originalUrl} from origin: ${req.headers.origin || 'none'}`);
             return res.status(401).json({ message: "Authentication required" });
         }
         const decoded = jsonwebtoken_1.default.verify(token, ACCESS_TOKEN_SECRET);
@@ -44,6 +45,7 @@ const authenticate = async (req, res, next) => {
             }
         });
         if (!user) {
+            console.warn(`[AUTH] 401: User not found for ID ${decoded.id}`);
             return res.status(401).json({ message: "User not found" });
         }
         if (user.isBlocked) {
@@ -53,6 +55,7 @@ const authenticate = async (req, res, next) => {
         next();
     }
     catch (error) {
+        console.error(`[AUTH] 401: Token verification failed: ${error.message}`);
         return res.status(401).json({ message: "Invalid or expired token" });
     }
 };
@@ -88,8 +91,8 @@ const authorize = (...requiredPermissions) => {
         if (!req.user) {
             return res.status(401).json({ message: "Authentication required" });
         }
-        // Admin superuser check - if role slug is 'admin', grant all
-        if (req.user.userRole?.slug === 'admin') {
+        // Admin superuser check - if role slug is 'admin' or 'super_admin', grant all
+        if (req.user.userRole?.slug === 'admin' || req.user.userRole?.slug === 'super_admin') {
             return next();
         }
         const userPermissions = req.user.userRole?.permissions.map(p => p.permission.slug) || [];

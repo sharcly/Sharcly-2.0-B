@@ -54,7 +54,8 @@ class AdminService {
         return await prisma_1.prisma.user.delete({ where: { id } });
     }
     static async createUser(userData) {
-        const { email, password, name, roleId } = userData;
+        const { password, name, roleId } = userData;
+        const email = userData.email?.toLowerCase().trim();
         const roleExists = await prisma_1.prisma.role.findUnique({ where: { id: roleId } });
         if (!roleExists) {
             throw new Error("Invalid role id");
@@ -84,7 +85,8 @@ class AdminService {
         });
     }
     static async updateUser(id, updateData) {
-        const { email, password, name, roleId } = updateData;
+        const { password, name, roleId } = updateData;
+        const email = updateData.email?.toLowerCase().trim();
         const prismaUpdateData = {};
         if (email)
             prismaUpdateData.email = email;

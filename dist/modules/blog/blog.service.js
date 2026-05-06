@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.BlogService = void 0;
 const prisma_1 = require("../../common/lib/prisma");
 const client_1 = require("@prisma/client");
+const image_service_1 = require("../image/image.service");
 class BlogService {
     static async getBlogs(query) {
         const { status, search, category, tags, page = "1", limit = "10" } = query;
@@ -50,17 +51,24 @@ class BlogService {
             include: { author: { select: { name: true } } },
         });
     }
-    static async createBlog(blogData, authorId) {
-        const { title, slug, content, excerpt, featuredImage, status, publishedAt, metaTitle, metaDescription, category, tags } = blogData;
+    static async createBlog(blogData, authorId, file) {
+        const { title, slug, content, excerpt, status, publishedAt, metaTitle, metaDescription, category, tags } = blogData;
+        let featuredImageData;
+        let featuredImageMimeType;
+        if (file) {
+            featuredImageData = await (0, image_service_1.optimizeImage)(file.buffer);
+            featuredImageMimeType = "image/webp";
+        }
         return await prisma_1.prisma.blog.create({
             data: {
                 title,
                 slug,
                 content,
                 excerpt,
-                featuredImage,
+                featuredImageData,
+                featuredImageMimeType,
                 category,
-                tags,
+                tags: Array.isArray(tags) ? tags : (tags ? [tags] : []),
                 status: status || client_1.BlogStatus.DRAFT,
                 publishedAt: publishedAt ? new Date(publishedAt) : (status === client_1.BlogStatus.PUBLISHED ? new Date() : null),
                 authorId,
@@ -69,12 +77,20 @@ class BlogService {
             }
         });
     }
-    static async updateBlog(id, blogData) {
+    static async updateBlog(id, blogData, file) {
         const { publishedAt, ...rest } = blogData;
+        let featuredImageData;
+        let featuredImageMimeType;
+        if (file) {
+            featuredImageData = await (0, image_service_1.optimizeImage)(file.buffer);
+            featuredImageMimeType = "image/webp";
+        }
         return await prisma_1.prisma.blog.update({
             where: { id },
             data: {
                 ...rest,
+                featuredImageData,
+                featuredImageMimeType,
                 publishedAt: publishedAt ? new Date(publishedAt) : undefined
             }
         });

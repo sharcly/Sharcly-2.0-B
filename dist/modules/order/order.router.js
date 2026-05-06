@@ -35,6 +35,7 @@ const router = (0, express_1.Router)();
  *         description: Unauthorized
  */
 router.post("/", auth_middleware_1.optionalAuth, (0, validate_middleware_1.validate)(validate_middleware_1.CreateOrderSchema), order_controller_1.createOrder);
+router.post("/preview", auth_middleware_1.optionalAuth, order_controller_1.previewOrder);
 /**
  * @swagger
  * /api/orders/my-orders:
@@ -123,4 +124,5 @@ router.patch("/:id/status", auth_middleware_1.authenticate, (0, auth_middleware_
  *       - bearerAuth: []
  */
 router.get("/:id/invoice", auth_middleware_1.authenticate, order_controller_1.downloadInvoice);
+router.post("/:id/cancel", auth_middleware_1.authenticate, order_controller_1.cancelOrder);
 exports.default = router;
