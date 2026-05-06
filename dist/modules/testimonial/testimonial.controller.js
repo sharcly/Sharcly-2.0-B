@@ -31,7 +31,7 @@ class TestimonialController {
     static async create(req, res) {
         try {
             const testimonial = await testimonial_service_1.TestimonialService.create(req.body);
-            res.status(21).json({ success: true, data: testimonial });
+            res.status(201).json({ success: true, data: testimonial });
         }
         catch (error) {
             res.status(500).json({ success: false, message: error.message });

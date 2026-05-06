@@ -52,7 +52,9 @@ class BlogService {
         });
     }
     static async createBlog(blogData, authorId, file) {
-        const { title, slug, content, excerpt, status, publishedAt, metaTitle, metaDescription, category, tags } = blogData;
+        const { title, slug, content, excerpt, status, publishedAt, metaTitle, metaDescription, category, tags, featuredImage } = blogData;
+        // Ensure unique slug
+        const finalSlug = await this.ensureUniqueSlug(slug || this.generateSlug(title));
         let featuredImageData;
         let featuredImageMimeType;
         if (file) {
@@ -62,7 +64,7 @@ class BlogService {
         return await prisma_1.prisma.blog.create({
             data: {
                 title,
-                slug,
+                slug: finalSlug,
                 content,
                 excerpt,
                 featuredImageData: featuredImageData,
@@ -77,8 +79,37 @@ class BlogService {
             }
         });
     }
+    static generateSlug(text) {
+        return text
+            .toLowerCase()
+            .replace(/[^\w ]+/g, "")
+            .replace(/ +/g, "-")
+            .slice(0, 80);
+    }
+    static async ensureUniqueSlug(slug) {
+        let uniqueSlug = slug;
+        let counter = 1;
+        while (true) {
+            const existing = await prisma_1.prisma.blog.findUnique({
+                where: { slug: uniqueSlug }
+            });
+            if (!existing)
+                break;
+            uniqueSlug = `${slug}-${counter}`;
+            counter++;
+        }
+        return uniqueSlug;
+    }
     static async updateBlog(id, blogData, file) {
-        const { publishedAt, ...rest } = blogData;
+        const { publishedAt, slug, featuredImage, ...rest } = blogData;
+        let finalSlug = slug;
+        if (slug) {
+            // Only check for uniqueness if the slug is changing
+            const currentBlog = await prisma_1.prisma.blog.findUnique({ where: { id } });
+            if (currentBlog && currentBlog.slug !== slug) {
+                finalSlug = await this.ensureUniqueSlug(slug);
+            }
+        }
         let featuredImageData;
         let featuredImageMimeType;
         if (file) {
