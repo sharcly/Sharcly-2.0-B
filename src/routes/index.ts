@@ -18,6 +18,7 @@ import marketingRoutes from "../modules/marketing/marketing.router";
 import paymentRoutes from "../modules/payment/payment.router";
 import testimonialRoutes from "../modules/testimonial/testimonial.router";
 import contactRoutes from "../modules/contact/contact.router";
+import faqRoutes from "../modules/faq/faq.router";
 
 const router = Router();
 
@@ -40,5 +41,6 @@ router.use("/marketing", marketingRoutes);
 router.use("/payments", paymentRoutes);
 router.use("/testimonials", testimonialRoutes);
 router.use("/contact", contactRoutes);
+router.use("/faqs", faqRoutes);
 
 export default router;
