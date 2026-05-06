@@ -24,7 +24,7 @@ export class BlogController {
 
   static async createBlog(req: Request, res: Response) {
     try {
-      const authorId = req.user.id;
+      const authorId = (req as any).user.id;
       const file = req.file as Express.Multer.File;
       const blog = await BlogService.createBlog(req.body, authorId, file);
       res.status(201).json({ success: true, blog });

@@ -23,7 +23,14 @@ class MarketingController {
     }
     static async createOffer(req, res) {
         try {
-            const offer = await marketing_service_1.MarketingService.createOffer(req.body);
+            const data = { ...req.body };
+            // Handle file upload
+            const files = req.files;
+            const imageFile = files?.find(f => f.fieldname === "image");
+            if (imageFile) {
+                data.image = imageFile.filename;
+            }
+            const offer = await marketing_service_1.MarketingService.createOffer(data);
             res.status(201).json(offer);
         }
         catch (error) {
@@ -32,7 +39,14 @@ class MarketingController {
     }
     static async updateOffer(req, res) {
         try {
-            const offer = await marketing_service_1.MarketingService.updateOffer(req.params.id, req.body);
+            const data = { ...req.body };
+            // Handle file upload
+            const files = req.files;
+            const imageFile = files?.find(f => f.fieldname === "image");
+            if (imageFile) {
+                data.image = imageFile.filename;
+            }
+            const offer = await marketing_service_1.MarketingService.updateOffer(req.params.id, data);
             res.json(offer);
         }
         catch (error) {
@@ -65,6 +79,31 @@ class MarketingController {
         try {
             const claims = await marketing_service_1.MarketingService.getClaims();
             res.json(claims);
+        }
+        catch (error) {
+            res.status(500).json({ message: error.message });
+        }
+    }
+    static async subscribeNewsletter(req, res) {
+        try {
+            const { email } = req.body;
+            if (!email) {
+                return res.status(400).json({ message: "Email is required" });
+            }
+            const result = await marketing_service_1.MarketingService.subscribeNewsletter(email);
+            res.json({
+                message: "Thank you for joining our community!",
+                ...result
+            });
+        }
+        catch (error) {
+            res.status(400).json({ message: error.message });
+        }
+    }
+    static async getSubscribers(req, res) {
+        try {
+            const subscribers = await marketing_service_1.MarketingService.getSubscribers();
+            res.json(subscribers);
         }
         catch (error) {
             res.status(500).json({ message: error.message });

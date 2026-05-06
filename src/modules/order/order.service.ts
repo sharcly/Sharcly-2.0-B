@@ -39,7 +39,7 @@ export class OrderService {
         variantId: variant ? variant.id : undefined,
         price,
         name: product.name,
-        image: product.image
+        image: (product as any).image
       });
     }
 
@@ -207,7 +207,7 @@ export class OrderService {
     // Klaviyo Tracking
     try {
       const seoSettings = await SeoService.getGlobalSettings();
-      KlaviyoService.init(seoSettings?.klaviyoPrivateKey);
+      KlaviyoService.init(seoSettings?.klaviyoPrivateKey || undefined);
       await KlaviyoService.trackEvent(email, "Placed Order", {
         "$value": Number(order.totalAmount),
         "OrderID": order.id,
@@ -332,7 +332,7 @@ export class OrderService {
 
     if (!order) throw new Error("Order not found");
     if (order.userId !== userId) throw new Error("Access denied");
-    if (![OrderStatus.PENDING, OrderStatus.CONFIRMED].includes(order.status)) {
+    if (!(<OrderStatus[]>[OrderStatus.PENDING, OrderStatus.CONFIRMED]).includes(order.status)) {
       throw new Error(`Order cannot be cancelled because it is already ${order.status.toLowerCase()}.`);
     }
 

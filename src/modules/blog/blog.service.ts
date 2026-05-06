@@ -73,7 +73,7 @@ export class BlogService {
         content,
         excerpt,
         featuredImage,
-        featuredImageData,
+        featuredImageData: featuredImageData as any,
         featuredImageMimeType,
         category,
         tags: Array.isArray(tags) ? tags : (tags ? [tags] : []),
@@ -138,7 +138,7 @@ export class BlogService {
         ...rest,
         slug: finalSlug,
         featuredImage,
-        featuredImageData,
+        featuredImageData: featuredImageData as any,
         featuredImageMimeType,
         publishedAt: publishedAt ? new Date(publishedAt) : undefined
       }
