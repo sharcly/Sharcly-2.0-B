@@ -40,7 +40,7 @@ class OrderService {
                 variantId: variant ? variant.id : undefined,
                 price,
                 name: product.name,
-                image: product.image
+                image: product.ogImage
             });
         }
         // Coupon Calculation
@@ -188,7 +188,7 @@ class OrderService {
         // Klaviyo Tracking
         try {
             const seoSettings = await seo_service_1.SeoService.getGlobalSettings();
-            klaviyo_service_1.KlaviyoService.init(seoSettings?.klaviyoPrivateKey);
+            klaviyo_service_1.KlaviyoService.init(seoSettings?.klaviyoPrivateKey || undefined);
             await klaviyo_service_1.KlaviyoService.trackEvent(email, "Placed Order", {
                 "$value": Number(order.totalAmount),
                 "OrderID": order.id,

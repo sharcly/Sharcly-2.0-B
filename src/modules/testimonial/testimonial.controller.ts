@@ -17,7 +17,7 @@ export class TestimonialController {
 
   static async getById(req: Request, res: Response) {
     try {
-      const testimonial = await TestimonialService.getById(req.params.id);
+      const testimonial = await TestimonialService.getById(req.params.id as string);
       if (!testimonial) {
         return res.status(404).json({ success: false, message: "Testimonial not found" });
       }
@@ -38,7 +38,7 @@ export class TestimonialController {
 
   static async update(req: Request, res: Response) {
     try {
-      const testimonial = await TestimonialService.update(req.params.id, req.body);
+      const testimonial = await TestimonialService.update(req.params.id as string, req.body);
       res.json({ success: true, data: testimonial });
     } catch (error: any) {
       res.status(500).json({ success: false, message: error.message });
@@ -47,7 +47,7 @@ export class TestimonialController {
 
   static async delete(req: Request, res: Response) {
     try {
-      await TestimonialService.delete(req.params.id);
+      await TestimonialService.delete(req.params.id as string);
       res.json({ success: true, message: "Testimonial deleted successfully" });
     } catch (error: any) {
       res.status(500).json({ success: false, message: error.message });

@@ -95,7 +95,7 @@ class MarketingService {
         // 7. Klaviyo Sync & Event Tracking
         try {
             const seoSettings = await seo_service_1.SeoService.getGlobalSettings();
-            klaviyo_service_1.KlaviyoService.init(seoSettings?.klaviyoPrivateKey);
+            klaviyo_service_1.KlaviyoService.init(seoSettings?.klaviyoPrivateKey || undefined);
             // Sync Profile
             await klaviyo_service_1.KlaviyoService.syncProfile({ email, phone });
             // Track Event
@@ -143,7 +143,7 @@ class MarketingService {
         // 2. Klaviyo Sync
         try {
             const seoSettings = await seo_service_1.SeoService.getGlobalSettings();
-            klaviyo_service_1.KlaviyoService.init(seoSettings?.klaviyoPrivateKey);
+            klaviyo_service_1.KlaviyoService.init(seoSettings?.klaviyoPrivateKey || undefined);
             // Add to list
             await klaviyo_service_1.KlaviyoService.subscribeToList(email);
             // Track event

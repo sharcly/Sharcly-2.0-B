@@ -65,7 +65,7 @@ class BlogService {
                 slug,
                 content,
                 excerpt,
-                featuredImageData,
+                featuredImageData: featuredImageData,
                 featuredImageMimeType,
                 category,
                 tags: Array.isArray(tags) ? tags : (tags ? [tags] : []),
@@ -89,7 +89,7 @@ class BlogService {
             where: { id },
             data: {
                 ...rest,
-                featuredImageData,
+                featuredImageData: featuredImageData,
                 featuredImageMimeType,
                 publishedAt: publishedAt ? new Date(publishedAt) : undefined
             }

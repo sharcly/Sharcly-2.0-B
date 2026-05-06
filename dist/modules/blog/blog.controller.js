@@ -26,7 +26,9 @@ class BlogController {
     }
     static async createBlog(req, res) {
         try {
-            const authorId = req.user.id;
+            const authorId = req.user?.id;
+            if (!authorId)
+                return res.status(401).json({ success: false, message: "Unauthorized" });
             const file = req.file;
             const blog = await blog_service_1.BlogService.createBlog(req.body, authorId, file);
             res.status(201).json({ success: true, blog });

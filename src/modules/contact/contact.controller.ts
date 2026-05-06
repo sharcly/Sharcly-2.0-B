@@ -29,7 +29,7 @@ export class ContactController {
     try {
       const { id } = req.params;
       const { status } = req.body;
-      const message = await ContactService.updateStatus(id, status);
+      const message = await ContactService.updateStatus(id as string, status);
       res.json(message);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -39,7 +39,7 @@ export class ContactController {
   static async deleteMessage(req: Request, res: Response) {
     try {
       const { id } = req.params;
-      await ContactService.deleteMessage(id);
+      await ContactService.deleteMessage(id as string);
       res.json({ message: "Message deleted successfully" });
     } catch (error: any) {
       res.status(500).json({ message: error.message });

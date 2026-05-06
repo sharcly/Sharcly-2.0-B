@@ -48,7 +48,7 @@ class FaqController {
             const { id } = req.params;
             const { question, answer, category, order, isActive } = req.body;
             const faq = await prisma_1.prisma.faq.update({
-                where: { id },
+                where: { id: id },
                 data: {
                     question,
                     answer,
@@ -67,7 +67,7 @@ class FaqController {
     static async deleteFaq(req, res) {
         try {
             const { id } = req.params;
-            await prisma_1.prisma.faq.delete({ where: { id } });
+            await prisma_1.prisma.faq.delete({ where: { id: id } });
             res.json({ success: true, message: "FAQ deleted successfully" });
         }
         catch (error) {
