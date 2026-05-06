@@ -40,7 +40,7 @@ class OrderService {
                 variantId: variant ? variant.id : undefined,
                 price,
                 name: product.name,
-                image: product.image
+                image: product.ogImage
             });
         }
         // Coupon Calculation

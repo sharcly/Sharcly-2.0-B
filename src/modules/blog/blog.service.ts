@@ -72,7 +72,6 @@ export class BlogService {
         slug: finalSlug,
         content,
         excerpt,
-        featuredImage,
         featuredImageData: featuredImageData as any,
         featuredImageMimeType,
         category,
@@ -136,8 +135,6 @@ export class BlogService {
       where: { id },
       data: {
         ...rest,
-        slug: finalSlug,
-        featuredImage,
         featuredImageData: featuredImageData as any,
         featuredImageMimeType,
         publishedAt: publishedAt ? new Date(publishedAt) : undefined

@@ -67,7 +67,6 @@ class BlogService {
                 slug: finalSlug,
                 content,
                 excerpt,
-                featuredImage,
                 featuredImageData: featuredImageData,
                 featuredImageMimeType,
                 category,
@@ -121,8 +120,6 @@ class BlogService {
             where: { id },
             data: {
                 ...rest,
-                slug: finalSlug,
-                featuredImage,
                 featuredImageData: featuredImageData,
                 featuredImageMimeType,
                 publishedAt: publishedAt ? new Date(publishedAt) : undefined
