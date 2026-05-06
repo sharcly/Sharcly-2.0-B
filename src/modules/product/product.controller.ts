@@ -4,13 +4,14 @@ import { ProductService } from "./product.service";
 
 export const getProducts = async (req: Request, res: Response) => {
   try {
-    const { category, search, sort, page = "1", limit = "10" } = req.query;
+    const { category, search, sort, page = "1", limit = "10", featured } = req.query;
 
     const pageNum = parseInt(page as string);
     const limitNum = parseInt(limit as string);
     const skip = (pageNum - 1) * limitNum;
 
     const where: any = {};
+    if (featured === "true") where.featured = true;
     if (category) where.category = { slug: category as string };
     if (search) where.OR = [
       { name: { contains: search as string, mode: "insensitive" } },
@@ -95,7 +96,7 @@ export const createProduct = async (req: Request, res: Response) => {
       name, subtitle, slug, sku, description, price, stock, categoryId, typeId, tags, collections,
       status, discountable, weight, length, height, width, originCountry, material, hsCode, midCode,
       metaTitle, metaDescription, keywords, canonicalUrl, ogImage, changefreq,
-      options, metadata, variants
+      options, metadata, variants, featured
     } = req.body;
 
     if (!categoryId) {
@@ -203,6 +204,7 @@ export const createProduct = async (req: Request, res: Response) => {
         changefreq: changefreq || "monthly",
         options: optionsData,
         metadata: metadataData,
+        featured: featured === "true" || featured === true,
         discountable: discountable === "true" || discountable === true,
         collections: collections && Array.isArray(collections) ? {
           connect: collections.map((id: string) => ({ id }))
@@ -281,7 +283,7 @@ export const updateProduct = async (req: Request, res: Response) => {
       name, subtitle, slug, sku, description, price, stock, categoryId, typeId, tags, collections,
       status, discountable, weight, length, height, width, originCountry, material, hsCode, midCode,
       metaTitle, metaDescription, keywords, canonicalUrl, ogImage, changefreq,
-      options, metadata, variants
+      options, metadata, variants, featured
     } = req.body;
 
     const tagsArray = tags ? (Array.isArray(tags) ? tags : (typeof tags === "string" ? JSON.parse(tags) : [])) : undefined;
@@ -356,6 +358,7 @@ export const updateProduct = async (req: Request, res: Response) => {
         changefreq,
         options: optionsData,
         metadata: metadataData,
+        featured: featured === "true" || featured === true || (featured === "false" || featured === false ? false : undefined),
         discountable: discountable === "true" || discountable === true,
         collections: collections && Array.isArray(collections) ? {
           set: collections.map((id: string) => ({ id }))

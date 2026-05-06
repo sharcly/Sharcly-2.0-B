@@ -122,6 +122,7 @@ model Product {
   midCode         String?
   ogImage         String?
   options         Json?
+  featured        Boolean          @default(false)
   originCountry   String?
   status          ProductStatus    @default(DRAFT)
   subtitle        String?
