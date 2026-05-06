@@ -7,7 +7,9 @@ import {
   deleteSeo,
   bulkUpsertSeo,
   getGlobalSeo,
-  updateGlobalSeo
+  updateGlobalSeo,
+  getSitemap,
+  getRobots
 } from "./seo.controller";
 import { authenticate, authorize } from "../../common/middlewares/auth.middleware";
 import { validate, SeoUpsertSchema, GlobalSeoSchema } from "../../common/middlewares/validate.middleware";
@@ -17,6 +19,8 @@ const router = Router();
 // Public routes
 router.get("/page/:slug", getSeoBySlug);
 router.get("/global/settings", getGlobalSeo);
+router.get("/sitemap.xml", getSitemap);
+router.get("/robots.txt", getRobots);
 
 // Admin routes
 router.get("/", authenticate, authorize("seo.manage"), getAllSeo);

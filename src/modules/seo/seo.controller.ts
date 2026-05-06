@@ -89,3 +89,23 @@ export const updateGlobalSeo = async (req: Request, res: Response) => {
     res.status(500).json({ success: false, message: "Failed to save global SEO" });
   }
 };
+
+export const getSitemap = async (req: Request, res: Response) => {
+  try {
+    const xml = await SeoService.generateSitemap();
+    res.header("Content-Type", "application/xml");
+    res.status(200).send(xml);
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: "Failed to generate sitemap" });
+  }
+};
+
+export const getRobots = async (req: Request, res: Response) => {
+  try {
+    const robots = await SeoService.generateRobots();
+    res.header("Content-Type", "text/plain");
+    res.status(200).send(robots);
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: "Failed to generate robots.txt" });
+  }
+};
