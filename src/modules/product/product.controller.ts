@@ -256,10 +256,16 @@ export const createProduct = async (req: Request, res: Response) => {
     }
 
     // 3. Process and Link Variant Images
+    console.log(`[DEBUG] Processing ${variantImagesMap.size} variant images in createProduct...`);
     for (const [idx, imgData] of variantImagesMap.entries()) {
       const targetVData = variantData[idx];
-      if (!targetVData) continue;
+      if (!targetVData) {
+        console.log(`[DEBUG] No target variant data found for index ${idx}`);
+        continue;
+      }
 
+      console.log(`[DEBUG] Matching image for index ${idx} (Title: ${targetVData.title})`);
+      
       // Find the created variant that matches the title and price from input
       const variant = product.variants.find(v => 
         v.title === targetVData.title && 
@@ -267,18 +273,22 @@ export const createProduct = async (req: Request, res: Response) => {
       );
 
       if (variant) {
+        console.log(`[DEBUG] Found matching variant! ID: ${variant.id}`);
         const newImage = await prisma.productImage.create({
           data: {
             productId: product.id,
             data: imgData.data,
             mimeType: imgData.mimeType,
-            order: 10 + idx, // Put variant images after main images
+            order: 10 + idx, 
           }
         });
         await prisma.productVariant.update({
           where: { id: variant.id },
           data: { image: newImage.id }
         });
+        console.log(`[DEBUG] Successfully linked image ${newImage.id} to variant ${variant.id}`);
+      } else {
+        console.log(`[DEBUG] FAILED to find variant with title: ${targetVData.title}`);
       }
     }
 
@@ -462,14 +472,21 @@ export const updateProduct = async (req: Request, res: Response) => {
     }
 
     // 3. Process and Link New Variant Images
+    console.log(`[DEBUG] Processing ${variantImagesMap.size} variant images...`);
     for (const [idx, imgData] of variantImagesMap.entries()) {
       const targetVData = variantData[idx];
-      if (!targetVData) continue;
+      if (!targetVData) {
+        console.log(`[DEBUG] No target variant data found for index ${idx}`);
+        continue;
+      }
 
+      console.log(`[DEBUG] Matching image for index ${idx} (Title: ${targetVData.title})`);
+      
       // Find the updated variant that matches the title
       const variant = product.variants.find(v => v.title === targetVData.title);
 
       if (variant) {
+        console.log(`[DEBUG] Found matching variant! ID: ${variant.id}`);
         const newImage = await prisma.productImage.create({
           data: {
             productId: product.id,
@@ -482,6 +499,9 @@ export const updateProduct = async (req: Request, res: Response) => {
           where: { id: variant.id },
           data: { image: newImage.id }
         });
+        console.log(`[DEBUG] Successfully linked image ${newImage.id} to variant ${variant.id}`);
+      } else {
+        console.log(`[DEBUG] FAILED to find variant with title: ${targetVData.title}`);
       }
     }
 
