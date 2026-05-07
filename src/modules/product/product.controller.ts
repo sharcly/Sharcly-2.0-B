@@ -6,8 +6,8 @@ export const getProducts = async (req: Request, res: Response) => {
   try {
     const { category, search, sort, page = "1", limit = "10", featured } = req.query;
 
-    const pageNum = parseInt(page as string);
-    const limitNum = parseInt(limit as string);
+    const pageNum = Math.max(1, parseInt(page as string) || 1);
+    const limitNum = Math.min(Math.max(1, parseInt(limit as string) || 10), 100); // Cap at 100
     const skip = (pageNum - 1) * limitNum;
 
     const where: any = {};
@@ -54,7 +54,7 @@ export const getProducts = async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error("Fetch products error:", error);
-    res.status(500).json({ message: "Failed to fetch products", error });
+    res.status(500).json({ message: "Failed to fetch products" });
   }
 };
 
@@ -128,21 +128,6 @@ export const createProduct = async (req: Request, res: Response) => {
         order: index,
         isThumbnail: index === 0
       }));
-
-      // Process ogImage file if present
-      const ogImgFile = files.find(f => f.fieldname === "ogImage" || f.fieldname === "og_image");
-      if (ogImgFile) {
-        const ogImageRecord = await prisma.productImage.create({
-          data: {
-            productId: "TEMP_ID", // Will be updated if nested creation fails, but here we handle it differently
-            data: ogImgFile.buffer,
-            mimeType: ogImgFile.mimetype,
-            order: 99,
-          }
-        });
-        // We'll update the productId later if necessary, or just use the ID
-        // Actually, it's easier to just push it to processedImages and mark it? No, ogImage in Product is a string.
-      }
 
       const variantImgFiles = files.filter(f => f.fieldname.startsWith("variant_image_"));
       variantImgFiles.forEach(file => {
@@ -256,16 +241,10 @@ export const createProduct = async (req: Request, res: Response) => {
     }
 
     // 3. Process and Link Variant Images
-    console.log(`[DEBUG] Processing ${variantImagesMap.size} variant images in createProduct...`);
     for (const [idx, imgData] of variantImagesMap.entries()) {
       const targetVData = variantData[idx];
-      if (!targetVData) {
-        console.log(`[DEBUG] No target variant data found for index ${idx}`);
-        continue;
-      }
+      if (!targetVData) continue;
 
-      console.log(`[DEBUG] Matching image for index ${idx} (Title: ${targetVData.title})`);
-      
       // Find the created variant that matches the title and price from input
       const variant = product.variants.find(v => 
         v.title === targetVData.title && 
@@ -273,7 +252,6 @@ export const createProduct = async (req: Request, res: Response) => {
       );
 
       if (variant) {
-        console.log(`[DEBUG] Found matching variant! ID: ${variant.id}`);
         const newImage = await prisma.productImage.create({
           data: {
             productId: product.id,
@@ -286,13 +264,10 @@ export const createProduct = async (req: Request, res: Response) => {
           where: { id: variant.id },
           data: { image: newImage.id }
         });
-        console.log(`[DEBUG] Successfully linked image ${newImage.id} to variant ${variant.id}`);
-      } else {
-        console.log(`[DEBUG] FAILED to find variant with title: ${targetVData.title}`);
       }
     }
 
-    console.log(`[ProductInfo] Created product ${product.id} with ${processedImages.length} images.`);
+
 
     // Re-fetch product to get updated variant image links
     const updatedProduct = await prisma.product.findUnique({
@@ -472,21 +447,14 @@ export const updateProduct = async (req: Request, res: Response) => {
     }
 
     // 3. Process and Link New Variant Images
-    console.log(`[DEBUG] Processing ${variantImagesMap.size} variant images...`);
     for (const [idx, imgData] of variantImagesMap.entries()) {
       const targetVData = variantData[idx];
-      if (!targetVData) {
-        console.log(`[DEBUG] No target variant data found for index ${idx}`);
-        continue;
-      }
+      if (!targetVData) continue;
 
-      console.log(`[DEBUG] Matching image for index ${idx} (Title: ${targetVData.title})`);
-      
       // Find the updated variant that matches the title
       const variant = product.variants.find(v => v.title === targetVData.title);
 
       if (variant) {
-        console.log(`[DEBUG] Found matching variant! ID: ${variant.id}`);
         const newImage = await prisma.productImage.create({
           data: {
             productId: product.id,
@@ -499,9 +467,6 @@ export const updateProduct = async (req: Request, res: Response) => {
           where: { id: variant.id },
           data: { image: newImage.id }
         });
-        console.log(`[DEBUG] Successfully linked image ${newImage.id} to variant ${variant.id}`);
-      } else {
-        console.log(`[DEBUG] FAILED to find variant with title: ${targetVData.title}`);
       }
     }
 
