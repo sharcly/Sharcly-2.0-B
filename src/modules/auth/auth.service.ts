@@ -46,9 +46,10 @@ export class AuthService {
       throw new Error("User already exists");
     }
 
-    // Verify OTP
+    // Verify OTP — compare hashed value
     const otpRecord = await prisma.otp.findUnique({ where: { email } });
-    if (!otpRecord || otpRecord.code !== otp || otpRecord.expiresAt < new Date()) {
+    const hashedInputOtp = crypto.createHash("sha256").update(otp).digest("hex");
+    if (!otpRecord || otpRecord.code !== hashedInputOtp || otpRecord.expiresAt < new Date()) {
       throw new Error("Invalid or expired verification code.");
     }
 
@@ -120,10 +121,13 @@ export class AuthService {
     const code = crypto.randomInt(100000, 999999).toString();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
+    // Hash OTP before storing — never store plain-text OTPs in DB
+    const hashedCode = crypto.createHash("sha256").update(code).digest("hex");
+
     await prisma.otp.upsert({
       where: { email },
-      update: { code, expiresAt },
-      create: { email, code, expiresAt }
+      update: { code: hashedCode, expiresAt },
+      create: { email, code: hashedCode, expiresAt }
     });
 
     try {
