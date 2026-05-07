@@ -17,7 +17,7 @@ import { validate, SeoUpsertSchema, GlobalSeoSchema } from "../../common/middlew
 const router = Router();
 
 // Public routes
-router.get("/page/:slug", getSeoBySlug);
+router.get(/\/page\/(.*)/, getSeoBySlug);
 router.get("/global/settings", getGlobalSeo);
 router.get("/sitemap.xml", getSitemap);
 router.get("/robots.txt", getRobots);

@@ -225,7 +225,7 @@ export const createProduct = async (req: Request, res: Response) => {
             inventoryQuantity: parseInt(v.inventoryQuantity || v.stock || 0),
             manageInventory: v.manageInventory === "true" || v.manageInventory === true || v.manageInventory === undefined,
             allowBackorder: v.allowBackorder === "true" || v.allowBackorder === true,
-            // image: variantImagesMap.get(idx) ? "BINARY_LATER" : (typeof v.image === 'string' ? v.image : null),
+            image: typeof v.image === 'string' ? v.image : null,
             options: v.options
           }))
         }
@@ -255,15 +255,57 @@ export const createProduct = async (req: Request, res: Response) => {
       });
     }
 
+    // 3. Process and Link Variant Images
+    for (const [idx, imgData] of variantImagesMap.entries()) {
+      const targetVData = variantData[idx];
+      if (!targetVData) continue;
+
+      // Find the created variant that matches the title and price from input
+      const variant = product.variants.find(v => 
+        v.title === targetVData.title && 
+        Math.abs(Number(v.price) - Number(targetVData.price || targetVData.prices?.[0]?.amount || 0)) < 0.01
+      );
+
+      if (variant) {
+        const newImage = await prisma.productImage.create({
+          data: {
+            productId: product.id,
+            data: imgData.data,
+            mimeType: imgData.mimeType,
+            order: 10 + idx, // Put variant images after main images
+          }
+        });
+        await prisma.productVariant.update({
+          where: { id: variant.id },
+          data: { image: newImage.id }
+        });
+      }
+    }
+
     console.log(`[ProductInfo] Created product ${product.id} with ${processedImages.length} images.`);
+
+    // Re-fetch product to get updated variant image links
+    const updatedProduct = await prisma.product.findUnique({
+      where: { id: product.id },
+      include: {
+        images: { select: { id: true, isThumbnail: true, order: true, mimeType: true } },
+        variants: { orderBy: { createdAt: 'asc' } },
+        type: true,
+        tags: true,
+        category: true,
+        collections: true
+      }
+    });
+
+    if (!updatedProduct) throw new Error("Product re-fetch failed");
 
     res.status(201).json({ 
       success: true, 
       product: {
-        ...product,
-        price: Number(product.price),
-        variants: product.variants.map((v: any) => ({ ...v, price: Number(v.price) })),
-        imageUrls: product.images.map((img: any) => `/api/images/${img.id}`)
+        ...updatedProduct,
+        price: Number(updatedProduct.price),
+        variants: updatedProduct.variants.map((v: any) => ({ ...v, price: Number(v.price) })),
+        imageUrls: updatedProduct.images.map((img: any) => `/api/images/${img.id}`)
       }
     });
   } catch (error: any) {
@@ -291,6 +333,8 @@ export const updateProduct = async (req: Request, res: Response) => {
     const optionsData = options ? (typeof options === "string" ? JSON.parse(options) : options) : undefined;
     const metadataData = metadata ? (typeof metadata === "string" ? JSON.parse(metadata) : metadata) : undefined;
 
+    const variantImagesMap = new Map();
+
     const files = (req.files as any[]) || [];
     let processedImages: any[] = [];
     
@@ -307,6 +351,12 @@ export const updateProduct = async (req: Request, res: Response) => {
         order: index,
         isThumbnail: index === 0
       }));
+
+      const variantImgFiles = files.filter(f => f.fieldname.startsWith("variant_image_"));
+      variantImgFiles.forEach(file => {
+        const index = parseInt(file.fieldname.split("_").pop() || "0");
+        variantImagesMap.set(index, { data: file.buffer, mimeType: file.mimetype });
+      });
     }
 
     // 2. Fallback: Base64 from body
@@ -381,6 +431,7 @@ export const updateProduct = async (req: Request, res: Response) => {
             inventoryQuantity: parseInt(v.inventoryQuantity || v.stock || 0),
             manageInventory: v.manageInventory === "true" || v.manageInventory === true || v.manageInventory === undefined,
             allowBackorder: v.allowBackorder === "true" || v.allowBackorder === true,
+            image: typeof v.image === 'string' ? v.image : null,
             options: v.options
           }))
         } : undefined
@@ -410,13 +461,52 @@ export const updateProduct = async (req: Request, res: Response) => {
       });
     }
 
+    // 3. Process and Link New Variant Images
+    for (const [idx, imgData] of variantImagesMap.entries()) {
+      const targetVData = variantData[idx];
+      if (!targetVData) continue;
+
+      // Find the updated variant that matches the title
+      const variant = product.variants.find(v => v.title === targetVData.title);
+
+      if (variant) {
+        const newImage = await prisma.productImage.create({
+          data: {
+            productId: product.id,
+            data: imgData.data,
+            mimeType: imgData.mimeType,
+            order: 20 + idx, 
+          }
+        });
+        await prisma.productVariant.update({
+          where: { id: variant.id },
+          data: { image: newImage.id }
+        });
+      }
+    }
+
+    // Re-fetch product to get updated variant image links
+    const updatedProduct = await prisma.product.findUnique({
+      where: { id: product.id },
+      include: {
+        images: { select: { id: true, isThumbnail: true, order: true, mimeType: true } },
+        variants: { orderBy: { createdAt: 'asc' } },
+        tags: true,
+        category: true,
+        collections: true,
+        type: true
+      }
+    });
+
+    if (!updatedProduct) throw new Error("Product re-fetch failed");
+
     res.status(200).json({ 
       success: true, 
       product: {
-        ...product,
-        price: Number(product.price),
-        variants: product.variants.map((v: any) => ({ ...v, price: Number(v.price) })),
-        imageUrls: product.images.map((img: any) => `/api/images/${img.id}`)
+        ...updatedProduct,
+        price: Number(updatedProduct.price),
+        variants: updatedProduct.variants.map((v: any) => ({ ...v, price: Number(v.price) })),
+        imageUrls: updatedProduct.images.map((img: any) => `/api/images/${img.id}`)
       }
     });
   } catch (error: any) {
