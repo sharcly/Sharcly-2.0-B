@@ -247,7 +247,8 @@ export class OrderService {
         user: { select: { name: true, email: true } }, 
         items: { include: { product: true } } 
       },
-      orderBy: { createdAt: "desc" }
+      orderBy: { createdAt: "desc" },
+      take: 500 // Limit to prevent timeouts on massive datasets
     });
 
     const settings = await prisma.storeSettings.findFirst();
@@ -276,8 +277,15 @@ export class OrderService {
   private static applyLegacyFallback(order: any, settings: any) {
     if (!order) return order;
 
-    const itemsSubtotal = order.items.reduce((acc: number, item: any) => acc + (Number(item.price) * item.quantity), 0);
-    const total = Number(order.totalAmount);
+    // Defensive check: ensure items is an array
+    const items = order.items || [];
+    const itemsSubtotal = items.reduce((acc: number, item: any) => {
+      const price = Number(item.price) || 0;
+      const quantity = Number(item.quantity) || 0;
+      return acc + (price * quantity);
+    }, 0);
+
+    const total = Number(order.totalAmount) || 0;
     const recordedTax = Number(order.taxAmount || 0);
     const recordedShipping = Number(order.shippingAmount || 0);
 
