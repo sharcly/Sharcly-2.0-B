@@ -147,6 +147,20 @@ app.get("/api/health", (req: Request, res: Response) => {
 });
 
 /* ─────────────────────────────────────────────
+   Swagger
+──────────────────────────────────────────── */
+
+const swaggerSpec = swaggerJsdoc(swaggerOptions);
+app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+
+/* ─────────────────────────────────────────────
+   Routes
+──────────────────────────────────────────── */
+
+app.use("/api", apiRoutes);
+app.use("/images", imageRouter);
+
+/* ─────────────────────────────────────────────
    Error Handler
 ──────────────────────────────────────────── */
 
