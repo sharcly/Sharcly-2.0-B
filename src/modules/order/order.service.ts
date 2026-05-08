@@ -198,9 +198,10 @@ export class OrderService {
           { orderId: order.id, userId: finalUserId }
         );
         clientSecret = paymentIntent.client_secret || undefined;
-      } catch (pErr) {
-        console.warn("Stripe Payment Intent Creation Failed:", pErr);
-        // We still created the order, but frontend will see error if no clientSecret
+      } catch (pErr: any) {
+        console.error("Stripe Payment Intent Creation Failed:", pErr);
+        // Throwing error here is critical so the user doesn't think the order was successful when payment failed to initiate
+        throw new Error(`Failed to initialize payment: ${pErr.message || "Stripe error"}`);
       }
     }
 
@@ -226,7 +227,7 @@ export class OrderService {
       console.warn("Email Confirmation Failed:", eErr);
     }
 
-    return { ...order, clientSecret };
+    return { order, clientSecret };
   }
 
   static async getMyOrders(userId: string) {
