@@ -43,9 +43,12 @@ export const getAllOrders = async (req: Request, res: Response) => {
   try {
     const orders = await OrderService.getAllOrders();
     res.status(200).json({ success: true, orders });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Fetch all orders error:", error);
-    res.status(500).json({ message: "Failed to fetch all orders" });
+    res.status(500).json({ 
+      message: "Failed to fetch all orders",
+      error: error.message 
+    });
   }
 };
 
