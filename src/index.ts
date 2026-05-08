@@ -64,7 +64,25 @@ const corsOptions: cors.CorsOptions = {
 };
 
 // Global CORS Middleware
-app.use(cors(corsOptions));
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true);
+    const normalizedOrigin = origin.replace(/\/$/, "").toLowerCase();
+    const isAllowed = allowedOrigins.some(o => o.toLowerCase().replace(/\/$/, "") === normalizedOrigin);
+    const isVercelPreview = normalizedOrigin.startsWith("https://sharcly") && normalizedOrigin.endsWith(".vercel.app");
+    if (isAllowed || isVercelPreview) {
+      callback(null, true);
+    } else {
+      callback(null, false);
+    }
+  },
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept", "X-CSRF-Token", "X-Api-Version"],
+  exposedHeaders: ["set-cookie"],
+  optionsSuccessStatus: 200,
+  maxAge: 86400
+}));
 
 // Force Vary: Origin header to prevent Vercel CDN caching issues
 app.use((req, res, next) => {
@@ -93,7 +111,7 @@ app.use("/api/payments/webhook", express.raw({ type: "application/json" }));
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
-// Vercel Analytics Middleware (Track API Hits)
+// Vercel Analytics Middleware
 app.use(async (req, res, next) => {
   if (process.env.VERCEL) {
     try {
@@ -102,16 +120,10 @@ app.use(async (req, res, next) => {
         path: req.path,
         method: req.method,
       });
-    } catch (err) {
-      // Ignore analytics errors to prevent app crash
-    }
+    } catch (err) {}
   }
   next();
 });
-
-/* ─────────────────────────────────────────────
-   Rate Limiting
-──────────────────────────────────────────── */
 
 import { csrfProtection } from "./common/middlewares/csrf.middleware";
 
@@ -133,21 +145,6 @@ app.use("/api", csrfProtection);
 app.get("/api/health", (req: Request, res: Response) => {
   res.json({ status: "ok" });
 });
-
-
-/* ─────────────────────────────────────────────
-   Swagger
-──────────────────────────────────────────── */
-
-const swaggerSpec = swaggerJsdoc(swaggerOptions);
-app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
-
-/* ─────────────────────────────────────────────
-   Routes
-──────────────────────────────────────────── */
-
-app.use("/api", apiRoutes);
-app.use("/images", imageRouter);
 
 /* ─────────────────────────────────────────────
    Error Handler
