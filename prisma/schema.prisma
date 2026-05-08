@@ -486,6 +486,7 @@ enum OrderStatus {
 enum ProductStatus {
   DRAFT
   PUBLISHED
+  ARCHIVED
 }
 
 enum BlogStatus {
