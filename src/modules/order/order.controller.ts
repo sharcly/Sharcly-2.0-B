@@ -13,8 +13,8 @@ export const createOrder = async (req: any, res: Response) => {
       return res.status(400).json({ message: "Email is required to place an order" });
     }
 
-    const result = await OrderService.createOrder(userId, email, orderData);
-    res.status(201).json({ success: true, ...result });
+    const order = await OrderService.createOrder(userId, email, orderData);
+    res.status(201).json({ success: true, order });
   } catch (error: any) {
     res.status(400).json({ message: error.message || "Order placement failed" });
   }
@@ -22,11 +22,9 @@ export const createOrder = async (req: any, res: Response) => {
 
 export const previewOrder = async (req: any, res: Response) => {
   try {
-    console.log("Order Preview Request:", JSON.stringify(req.body, null, 2));
     const summary = await OrderService.previewOrder(req.body);
     res.status(200).json({ success: true, summary });
   } catch (error: any) {
-    console.error("Order Preview Error:", error);
     res.status(400).json({ message: error.message || "Calculation failed" });
   }
 };
