@@ -310,13 +310,15 @@ export const updateProduct = async (req: Request, res: Response) => {
       name, subtitle, slug, sku, description, price, stock, categoryId, typeId, tags, collections,
       status, discountable, weight, length, height, width, originCountry, material, hsCode, midCode,
       metaTitle, metaDescription, keywords, canonicalUrl, ogImage, changefreq,
-      options, metadata, variants, featured
+      options, metadata, variants, featured, imageOrder
     } = req.body;
 
     const tagsArray = tags ? (Array.isArray(tags) ? tags : (typeof tags === "string" ? JSON.parse(tags) : [])) : undefined;
     const variantData = variants ? (typeof variants === "string" ? JSON.parse(variants) : variants) : undefined;
     const optionsData = options ? (typeof options === "string" ? JSON.parse(options) : options) : undefined;
     const metadataData = metadata ? (typeof metadata === "string" ? JSON.parse(metadata) : metadata) : undefined;
+    const hasImageOrder = req.body.imageOrder !== undefined;
+    const imageOrderArray = hasImageOrder ? (typeof imageOrder === "string" ? JSON.parse(imageOrder) : imageOrder) : [];
 
     const variantImagesMap = new Map();
 
@@ -364,6 +366,34 @@ export const updateProduct = async (req: Request, res: Response) => {
       });
     }
 
+    // 2.5 Handle Image Rearrangement & Cleanup (BEFORE update to avoid deleting new images)
+    if (hasImageOrder) {
+      const variantImageIds = (variantData || []).map((v: any) => v.image).filter(Boolean);
+      
+      // Cleanup removed images
+      await prisma.productImage.deleteMany({
+        where: {
+          productId: id as string,
+          id: { notIn: [...imageOrderArray, ...variantImageIds] },
+          order: { lt: 900 }
+        }
+      });
+
+      // Set orders for existing images
+      for (let i = 0; i < imageOrderArray.length; i++) {
+        const imgId = imageOrderArray[i];
+        if (typeof imgId === 'string' && imgId.length > 20) { // Likely a UUID
+           await prisma.productImage.updateMany({
+             where: { id: imgId, productId: id as string },
+             data: { 
+               order: i,
+               isThumbnail: i === 0 && !files.some(f => f.fieldname === "thumbnail")
+             }
+           });
+        }
+      }
+    }
+
     const product = await prisma.product.update({
       where: { id: id as string },
       data: {
@@ -404,7 +434,6 @@ export const updateProduct = async (req: Request, res: Response) => {
             .map((id: string) => ({ id }))
         } : undefined,
         images: processedImages.length > 0 ? {
-          deleteMany: {}, // Optional: clear old images if new ones are uploaded
           create: processedImages
         } : undefined,
         variants: variantData ? {
@@ -428,6 +457,7 @@ export const updateProduct = async (req: Request, res: Response) => {
         category: true
       }
     });
+
 
     // Handle OG Image file update specifically
     const ogImgFile = files.find(f => f.fieldname === "ogImage" || f.fieldname === "og_image");
@@ -505,8 +535,15 @@ export const deleteProduct = async (req: Request, res: Response) => {
     const { id } = req.params;
     await ProductService.deleteProduct(id as string);
     res.status(200).json({ success: true, message: "Product deleted" });
-  } catch (error) {
-    res.status(500).json({ message: "Failed to delete product" });
+  } catch (error: any) {
+    console.error("Delete product error:", error);
+    // Check for Prisma foreign key constraint error (P2003)
+    if (error.code === 'P2003') {
+      return res.status(400).json({ 
+        message: "Cannot delete product because it is linked to existing orders. Please archive it instead." 
+      });
+    }
+    res.status(500).json({ message: "Failed to delete product. It might be linked to other records." });
   }
 };
 
