@@ -61,7 +61,6 @@ model User {
   userRole          Role?     @relation(fields: [roleId], references: [id])
   wishlist          Product[] @relation("UserWishlist")
   stripeCustomerId  String?
-  cart              Json?
 
   @@map("users")
 }
@@ -487,7 +486,6 @@ enum OrderStatus {
 enum ProductStatus {
   DRAFT
   PUBLISHED
-  ARCHIVED
 }
 
 enum BlogStatus {

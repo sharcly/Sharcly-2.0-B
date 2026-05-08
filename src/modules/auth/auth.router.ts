@@ -201,6 +201,5 @@ router.post("/change-password", authenticate, validate(ChangePasswordSchema), ch
 router.post("/forgot-password", validate(ForgotPasswordSchema), forgotPassword);
 router.post("/reset-password", validate(ResetPasswordSchema), resetPassword);
 router.patch("/deactivate", authenticate, deactivateAccount);
-router.put("/cart", authenticate, updateCart);
 
 export default router;
