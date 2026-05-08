@@ -330,4 +330,37 @@ export class AuthService {
       data: { isBlocked: true, refreshToken: null }
     });
   }
+
+  static async updateCart(userId: string, cartItems: any) {
+    // Explicitly cast to any to bypass temporary TS synchronization issues after prisma generate
+    const user = await (prisma.user as any).update({
+      where: { id: userId },
+      data: { cart: cartItems || [] }
+    });
+
+    // Klaviyo Abandoned Cart Sync
+    if (cartItems && Array.isArray(cartItems) && cartItems.length > 0) {
+      try {
+        const { SeoService } = require("../seo/seo.service");
+        const { KlaviyoService } = require("../marketing/klaviyo.service");
+        const seoSettings = await SeoService.getGlobalSettings();
+        
+        KlaviyoService.init(seoSettings?.klaviyoPrivateKey || undefined);
+        await KlaviyoService.trackEvent(user.email, "Started Checkout", {
+          "$value": cartItems.reduce((acc: number, item: any) => acc + (Number(item.price) * item.quantity), 0),
+          "Items": cartItems.map((item: any) => ({
+            "ProductID": item.id,
+            "ProductName": item.name,
+            "Quantity": item.quantity,
+            "Price": item.price,
+            "ImageURL": item.image
+          }))
+        });
+      } catch (err) {
+        console.warn("Klaviyo Abandoned Cart Sync Failed:", err);
+      }
+    }
+
+    return user;
+  }
 }
