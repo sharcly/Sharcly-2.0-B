@@ -18,11 +18,7 @@ export class StatsService {
       }),
       prisma.order.count(),
       // Simple "Active Now" estimate: users who created something or registered in the last hour
-      prisma.user.count({
-        where: {
-          createdAt: { gte: new Date(Date.now() - 60 * 60 * 1000) }
-        }
-      })
+      prisma.product.count()
     ]);
 
     const totalRevenue = totalRevenueResult._sum.totalAmount || 0;
@@ -82,7 +78,7 @@ export class StatsService {
         totalRevenue,
         activeCustomers: customerCount,
         totalOrders,
-        activeNow: activeNow + 5
+        activeNow
       },
       chartData,
       recentTransactions: recentTransactions.map((t: any) => ({
