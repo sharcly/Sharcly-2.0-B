@@ -365,6 +365,18 @@ export class OrderService {
         });
       }
 
+      // Send Cancellation Email
+      try {
+        const { sendOrderStatusUpdate } = require("../auth/email.service");
+        // We fetch the user email from the order if not available, but here we can just use the userId to fetch user
+        const user = await tx.user.findUnique({ where: { id: userId }, select: { email: true } });
+        if (user) {
+          await sendOrderStatusUpdate(user.email, updatedOrder);
+        }
+      } catch (eErr) {
+        console.warn("Cancellation Email Failed:", eErr);
+      }
+
       return updatedOrder;
     });
   }
