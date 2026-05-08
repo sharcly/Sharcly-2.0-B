@@ -206,3 +206,13 @@ export const deactivateAccount = async (req: any, res: Response) => {
     res.status(500).json({ message: error.message || "Failed to deactivate account" });
   }
 };
+
+export const updateCart = async (req: any, res: Response) => {
+  try {
+    const { cartItems } = req.body;
+    await AuthService.updateCart(req.user.id, cartItems);
+    res.status(200).json({ success: true, message: "Cart updated successfully" });
+  } catch (error: any) {
+    res.status(500).json({ message: error.message || "Failed to update cart" });
+  }
+};
