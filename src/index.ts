@@ -44,8 +44,11 @@ const corsOptions: cors.CorsOptions = {
     
     const normalizedOrigin = origin.replace(/\/$/, "").toLowerCase();
     const isAllowed = allowedOrigins.some(o => o.toLowerCase().replace(/\/$/, "") === normalizedOrigin);
+    
+    // Allow any vercel.app subdomain that starts with sharcly
+    const isVercelPreview = normalizedOrigin.startsWith("https://sharcly") && normalizedOrigin.endsWith(".vercel.app");
 
-    if (isAllowed) {
+    if (isAllowed || isVercelPreview) {
       callback(null, true);
     } else {
       console.warn(`[CORS] Blocked origin: ${origin}`);
