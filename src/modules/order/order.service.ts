@@ -16,6 +16,10 @@ export class OrderService {
     const itemsWithPrice = [];
 
     for (const item of items) {
+      if (!item.productId) {
+        throw new Error("One or more items in your cart are invalid (Missing ID).");
+      }
+      
       let product = await prisma.product.findUnique({ where: { id: item.productId } });
       let variant = null;
 
@@ -27,7 +31,7 @@ export class OrderService {
         if (variant) {
            product = variant.product;
         } else {
-           throw new Error("One or more items in your cart are unavailable.");
+           throw new Error(`Item with ID ${item.productId} is unavailable.`);
         }
       }
 
