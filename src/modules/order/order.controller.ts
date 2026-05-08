@@ -13,8 +13,8 @@ export const createOrder = async (req: any, res: Response) => {
       return res.status(400).json({ message: "Email is required to place an order" });
     }
 
-    const order = await OrderService.createOrder(userId, email, orderData);
-    res.status(201).json({ success: true, order });
+    const { order, clientSecret } = await OrderService.createOrder(userId, email, orderData);
+    res.status(201).json({ success: true, order, clientSecret });
   } catch (error: any) {
     res.status(400).json({ message: error.message || "Order placement failed" });
   }

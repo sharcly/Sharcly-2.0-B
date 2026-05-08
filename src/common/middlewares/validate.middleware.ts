@@ -88,7 +88,7 @@ const AddressSchema = z.union([
 ]);
 
 export const CreateOrderSchema = z.object({
-  email: z.email("Valid email is required for guest orders").optional(),
+  email: z.string().email("Valid email is required for guest orders").optional(),
   items: z
     .array(
       z.object({
@@ -101,6 +101,8 @@ export const CreateOrderSchema = z.object({
   billingAddress: AddressSchema.optional(),
   paymentMethod: z.string().min(1, "Payment method is required").optional(),
   couponCode: z.string().max(50, "Coupon code too long").optional(),
+  password: z.string().min(6, "Password must be at least 6 characters").optional(),
+  name: z.string().max(100).optional(),
 });
 
 export const UpdateOrderStatusSchema = z.object({

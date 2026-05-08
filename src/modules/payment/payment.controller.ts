@@ -153,5 +153,9 @@ export const handleStripeWebhook = async (req: Request, res: Response) => {
     // Still return 200 to prevent Stripe from retrying — log and monitor separately
   }
 
-  return res.status(200).json({ received: true });
+  return res.status(200).json({ 
+    received: true, 
+    type: event.type,
+    id: event.id
+  });
 };
