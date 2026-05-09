@@ -1,4 +1,5 @@
 import { Request, Response } from "express";
+import { AuthRequest } from "../../common/middlewares/auth.middleware";
 import { BlogService } from "./blog.service";
 
 export class BlogController {
@@ -22,9 +23,10 @@ export class BlogController {
     }
   }
 
-  static async createBlog(req: Request, res: Response) {
+  static async createBlog(req: AuthRequest, res: Response) {
     try {
-      const authorId = req.user.id;
+      const authorId = req.user?.id;
+      if (!authorId) return res.status(401).json({ success: false, message: "Unauthorized" });
       const file = req.file as Express.Multer.File;
       const blog = await BlogService.createBlog(req.body, authorId, file);
       res.status(201).json({ success: true, blog });

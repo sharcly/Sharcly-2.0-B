@@ -48,7 +48,8 @@ export const csrfProtection = (req: Request, res: Response, next: NextFunction) 
     "/api/wholesale/inquiries",
     "/api/shipping/calculate",
     "/api/coupon/validate",
-    "/api/marketing/subscribe"
+    "/api/marketing/subscribe",
+    "/api/payments/webhook"
   ]; 
   
   const isSafeMethod = safeMethods.includes(req.method);

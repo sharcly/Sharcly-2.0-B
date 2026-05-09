@@ -4,38 +4,19 @@ import { ProductService } from "./product.service";
 
 export const getProducts = async (req: Request, res: Response) => {
   try {
-    const { category, search, sort, featured, page = "1", limit = "10" } = req.query;
+    const { category, search, sort, page = "1", limit = "10", featured } = req.query;
 
-    const pageNum = parseInt(page as string);
-    const limitNum = parseInt(limit as string);
+    const pageNum = Math.max(1, parseInt(page as string) || 1);
+    const limitNum = Math.min(Math.max(1, parseInt(limit as string) || 10), 100); // Cap at 100
     const skip = (pageNum - 1) * limitNum;
 
     const where: any = {};
-    const filters: any[] = [];
-
-    if (category) filters.push({ category: { slug: category as string } });
-    
-    if (featured === "true") {
-      filters.push({
-        OR: [
-          { featured: true },
-          { tags: { some: { name: "featured" } } }
-        ]
-      });
-    }
-
-    if (search) {
-      filters.push({
-        OR: [
-          { name: { contains: search as string, mode: "insensitive" } },
-          { description: { contains: search as string, mode: "insensitive" } }
-        ]
-      });
-    }
-
-    if (filters.length > 0) {
-      where.AND = filters;
-    }
+    if (featured === "true") where.featured = true;
+    if (category) where.category = { slug: category as string };
+    if (search) where.OR = [
+      { name: { contains: search as string, mode: "insensitive" } },
+      { description: { contains: search as string, mode: "insensitive" } }
+    ];
 
     const [products, total] = await Promise.all([
       prisma.product.findMany({
@@ -73,7 +54,7 @@ export const getProducts = async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error("Fetch products error:", error);
-    res.status(500).json({ message: "Failed to fetch products", error });
+    res.status(500).json({ message: "Failed to fetch products" });
   }
 };
 
@@ -148,21 +129,6 @@ export const createProduct = async (req: Request, res: Response) => {
         isThumbnail: index === 0
       }));
 
-      // Process ogImage file if present
-      const ogImgFile = files.find(f => f.fieldname === "ogImage" || f.fieldname === "og_image");
-      if (ogImgFile) {
-        const ogImageRecord = await prisma.productImage.create({
-          data: {
-            productId: "TEMP_ID", // Will be updated if nested creation fails, but here we handle it differently
-            data: ogImgFile.buffer,
-            mimeType: ogImgFile.mimetype,
-            order: 99,
-          }
-        });
-        // We'll update the productId later if necessary, or just use the ID
-        // Actually, it's easier to just push it to processedImages and mark it? No, ogImage in Product is a string.
-      }
-
       const variantImgFiles = files.filter(f => f.fieldname.startsWith("variant_image_"));
       variantImgFiles.forEach(file => {
         const index = parseInt(file.fieldname.split("_").pop() || "0");
@@ -223,6 +189,7 @@ export const createProduct = async (req: Request, res: Response) => {
         changefreq: changefreq || "monthly",
         options: optionsData,
         metadata: metadataData,
+        featured: featured === "true" || featured === true,
         discountable: discountable === "true" || discountable === true,
         featured: featured === "true" || featured === true,
         collections: collections && Array.isArray(collections) ? {
@@ -244,7 +211,7 @@ export const createProduct = async (req: Request, res: Response) => {
             inventoryQuantity: parseInt(v.inventoryQuantity || v.stock || 0),
             manageInventory: v.manageInventory === "true" || v.manageInventory === true || v.manageInventory === undefined,
             allowBackorder: v.allowBackorder === "true" || v.allowBackorder === true,
-            // image: variantImagesMap.get(idx) ? "BINARY_LATER" : (typeof v.image === 'string' ? v.image : null),
+            image: typeof v.image === 'string' ? v.image : null,
             options: v.options
           }))
         }
@@ -274,15 +241,57 @@ export const createProduct = async (req: Request, res: Response) => {
       });
     }
 
-    console.log(`[ProductInfo] Created product ${product.id} with ${processedImages.length} images.`);
+    // 3. Process and Link Variant Images
+    for (const [idx, imgData] of variantImagesMap.entries()) {
+      const targetVData = variantData[idx];
+      if (!targetVData) continue;
+
+      // Find the created variant that matches the title and price from input
+      const variant = product.variants.find(v => 
+        v.title === targetVData.title && 
+        Math.abs(Number(v.price) - Number(targetVData.price || targetVData.prices?.[0]?.amount || 0)) < 0.01
+      );
+
+      if (variant) {
+        const newImage = await prisma.productImage.create({
+          data: {
+            productId: product.id,
+            data: imgData.data,
+            mimeType: imgData.mimeType,
+            order: 10 + idx, 
+          }
+        });
+        await prisma.productVariant.update({
+          where: { id: variant.id },
+          data: { image: newImage.id }
+        });
+      }
+    }
+
+
+
+    // Re-fetch product to get updated variant image links
+    const updatedProduct = await prisma.product.findUnique({
+      where: { id: product.id },
+      include: {
+        images: { select: { id: true, isThumbnail: true, order: true, mimeType: true } },
+        variants: { orderBy: { createdAt: 'asc' } },
+        type: true,
+        tags: true,
+        category: true,
+        collections: true
+      }
+    });
+
+    if (!updatedProduct) throw new Error("Product re-fetch failed");
 
     res.status(201).json({ 
       success: true, 
       product: {
-        ...product,
-        price: Number(product.price),
-        variants: product.variants.map((v: any) => ({ ...v, price: Number(v.price) })),
-        imageUrls: product.images.map((img: any) => `/api/images/${img.id}`)
+        ...updatedProduct,
+        price: Number(updatedProduct.price),
+        variants: updatedProduct.variants.map((v: any) => ({ ...v, price: Number(v.price) })),
+        imageUrls: updatedProduct.images.map((img: any) => `/api/images/${img.id}`)
       }
     });
   } catch (error: any) {
@@ -302,13 +311,17 @@ export const updateProduct = async (req: Request, res: Response) => {
       name, subtitle, slug, sku, description, price, stock, categoryId, typeId, tags, collections,
       status, discountable, weight, length, height, width, originCountry, material, hsCode, midCode,
       metaTitle, metaDescription, keywords, canonicalUrl, ogImage, changefreq,
-      options, metadata, variants, featured
+      options, metadata, variants, featured, imageOrder
     } = req.body;
 
     const tagsArray = tags ? (Array.isArray(tags) ? tags : (typeof tags === "string" ? JSON.parse(tags) : [])) : undefined;
     const variantData = variants ? (typeof variants === "string" ? JSON.parse(variants) : variants) : undefined;
     const optionsData = options ? (typeof options === "string" ? JSON.parse(options) : options) : undefined;
     const metadataData = metadata ? (typeof metadata === "string" ? JSON.parse(metadata) : metadata) : undefined;
+    const hasImageOrder = req.body.imageOrder !== undefined;
+    const imageOrderArray = hasImageOrder ? (typeof imageOrder === "string" ? JSON.parse(imageOrder) : imageOrder) : [];
+
+    const variantImagesMap = new Map();
 
     const files = (req.files as any[]) || [];
     let processedImages: any[] = [];
@@ -326,6 +339,12 @@ export const updateProduct = async (req: Request, res: Response) => {
         order: index,
         isThumbnail: index === 0
       }));
+
+      const variantImgFiles = files.filter(f => f.fieldname.startsWith("variant_image_"));
+      variantImgFiles.forEach(file => {
+        const index = parseInt(file.fieldname.split("_").pop() || "0");
+        variantImagesMap.set(index, { data: file.buffer, mimeType: file.mimetype });
+      });
     }
 
     // 2. Fallback: Base64 from body
@@ -346,6 +365,34 @@ export const updateProduct = async (req: Request, res: Response) => {
           });
         }
       });
+    }
+
+    // 2.5 Handle Image Rearrangement & Cleanup (BEFORE update to avoid deleting new images)
+    if (hasImageOrder) {
+      const variantImageIds = (variantData || []).map((v: any) => v.image).filter(Boolean);
+      
+      // Cleanup removed images
+      await prisma.productImage.deleteMany({
+        where: {
+          productId: id as string,
+          id: { notIn: [...imageOrderArray, ...variantImageIds] },
+          order: { lt: 900 }
+        }
+      });
+
+      // Set orders for existing images
+      for (let i = 0; i < imageOrderArray.length; i++) {
+        const imgId = imageOrderArray[i];
+        if (typeof imgId === 'string' && imgId.length > 20) { // Likely a UUID
+           await prisma.productImage.updateMany({
+             where: { id: imgId, productId: id as string },
+             data: { 
+               order: i,
+               isThumbnail: i === 0 && !files.some(f => f.fieldname === "thumbnail")
+             }
+           });
+        }
+      }
     }
 
     const product = await prisma.product.update({
@@ -377,6 +424,7 @@ export const updateProduct = async (req: Request, res: Response) => {
         changefreq,
         options: optionsData,
         metadata: metadataData,
+        featured: featured === "true" || featured === true || (featured === "false" || featured === false ? false : undefined),
         discountable: discountable === "true" || discountable === true,
         featured: featured !== undefined ? (featured === "true" || featured === true) : undefined,
         collections: collections && Array.isArray(collections) ? {
@@ -388,7 +436,6 @@ export const updateProduct = async (req: Request, res: Response) => {
             .map((id: string) => ({ id }))
         } : undefined,
         images: processedImages.length > 0 ? {
-          deleteMany: {}, // Optional: clear old images if new ones are uploaded
           create: processedImages
         } : undefined,
         variants: variantData ? {
@@ -400,6 +447,7 @@ export const updateProduct = async (req: Request, res: Response) => {
             inventoryQuantity: parseInt(v.inventoryQuantity || v.stock || 0),
             manageInventory: v.manageInventory === "true" || v.manageInventory === true || v.manageInventory === undefined,
             allowBackorder: v.allowBackorder === "true" || v.allowBackorder === true,
+            image: typeof v.image === 'string' ? v.image : null,
             options: v.options
           }))
         } : undefined
@@ -411,6 +459,7 @@ export const updateProduct = async (req: Request, res: Response) => {
         category: true
       }
     });
+
 
     // Handle OG Image file update specifically
     const ogImgFile = files.find(f => f.fieldname === "ogImage" || f.fieldname === "og_image");
@@ -429,13 +478,52 @@ export const updateProduct = async (req: Request, res: Response) => {
       });
     }
 
+    // 3. Process and Link New Variant Images
+    for (const [idx, imgData] of variantImagesMap.entries()) {
+      const targetVData = variantData[idx];
+      if (!targetVData) continue;
+
+      // Find the updated variant that matches the title
+      const variant = product.variants.find(v => v.title === targetVData.title);
+
+      if (variant) {
+        const newImage = await prisma.productImage.create({
+          data: {
+            productId: product.id,
+            data: imgData.data,
+            mimeType: imgData.mimeType,
+            order: 20 + idx, 
+          }
+        });
+        await prisma.productVariant.update({
+          where: { id: variant.id },
+          data: { image: newImage.id }
+        });
+      }
+    }
+
+    // Re-fetch product to get updated variant image links
+    const updatedProduct = await prisma.product.findUnique({
+      where: { id: product.id },
+      include: {
+        images: { select: { id: true, isThumbnail: true, order: true, mimeType: true } },
+        variants: { orderBy: { createdAt: 'asc' } },
+        tags: true,
+        category: true,
+        collections: true,
+        type: true
+      }
+    });
+
+    if (!updatedProduct) throw new Error("Product re-fetch failed");
+
     res.status(200).json({ 
       success: true, 
       product: {
-        ...product,
-        price: Number(product.price),
-        variants: product.variants.map((v: any) => ({ ...v, price: Number(v.price) })),
-        imageUrls: product.images.map((img: any) => `/api/images/${img.id}`)
+        ...updatedProduct,
+        price: Number(updatedProduct.price),
+        variants: updatedProduct.variants.map((v: any) => ({ ...v, price: Number(v.price) })),
+        imageUrls: updatedProduct.images.map((img: any) => `/api/images/${img.id}`)
       }
     });
   } catch (error: any) {
@@ -449,8 +537,15 @@ export const deleteProduct = async (req: Request, res: Response) => {
     const { id } = req.params;
     await ProductService.deleteProduct(id as string);
     res.status(200).json({ success: true, message: "Product deleted" });
-  } catch (error) {
-    res.status(500).json({ message: "Failed to delete product" });
+  } catch (error: any) {
+    console.error("Delete product error:", error);
+    // Check for Prisma foreign key constraint error (P2003)
+    if (error.code === 'P2003') {
+      return res.status(400).json({ 
+        message: "Cannot delete product because it is linked to existing orders. Please archive it instead." 
+      });
+    }
+    res.status(500).json({ message: "Failed to delete product. It might be linked to other records." });
   }
 };
 

@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.BlogService = void 0;
 const prisma_1 = require("../../common/lib/prisma");
 const client_1 = require("@prisma/client");
+const image_service_1 = require("../image/image.service");
 class BlogService {
     static async getBlogs(query) {
         const { status, search, category, tags, page = "1", limit = "10" } = query;
@@ -50,17 +51,26 @@ class BlogService {
             include: { author: { select: { name: true } } },
         });
     }
-    static async createBlog(blogData, authorId) {
-        const { title, slug, content, excerpt, featuredImage, status, publishedAt, metaTitle, metaDescription, category, tags } = blogData;
+    static async createBlog(blogData, authorId, file) {
+        const { title, slug, content, excerpt, status, publishedAt, metaTitle, metaDescription, category, tags, featuredImage } = blogData;
+        // Ensure unique slug
+        const finalSlug = await this.ensureUniqueSlug(slug || this.generateSlug(title));
+        let featuredImageData;
+        let featuredImageMimeType;
+        if (file) {
+            featuredImageData = await (0, image_service_1.optimizeImage)(file.buffer);
+            featuredImageMimeType = "image/webp";
+        }
         return await prisma_1.prisma.blog.create({
             data: {
                 title,
-                slug,
+                slug: finalSlug,
                 content,
                 excerpt,
-                featuredImage,
+                featuredImageData: featuredImageData,
+                featuredImageMimeType,
                 category,
-                tags,
+                tags: Array.isArray(tags) ? tags : (tags ? [tags] : []),
                 status: status || client_1.BlogStatus.DRAFT,
                 publishedAt: publishedAt ? new Date(publishedAt) : (status === client_1.BlogStatus.PUBLISHED ? new Date() : null),
                 authorId,
@@ -69,12 +79,49 @@ class BlogService {
             }
         });
     }
-    static async updateBlog(id, blogData) {
-        const { publishedAt, ...rest } = blogData;
+    static generateSlug(text) {
+        return text
+            .toLowerCase()
+            .replace(/[^\w ]+/g, "")
+            .replace(/ +/g, "-")
+            .slice(0, 80);
+    }
+    static async ensureUniqueSlug(slug) {
+        let uniqueSlug = slug;
+        let counter = 1;
+        while (true) {
+            const existing = await prisma_1.prisma.blog.findUnique({
+                where: { slug: uniqueSlug }
+            });
+            if (!existing)
+                break;
+            uniqueSlug = `${slug}-${counter}`;
+            counter++;
+        }
+        return uniqueSlug;
+    }
+    static async updateBlog(id, blogData, file) {
+        const { publishedAt, slug, featuredImage, ...rest } = blogData;
+        let finalSlug = slug;
+        if (slug) {
+            // Only check for uniqueness if the slug is changing
+            const currentBlog = await prisma_1.prisma.blog.findUnique({ where: { id } });
+            if (currentBlog && currentBlog.slug !== slug) {
+                finalSlug = await this.ensureUniqueSlug(slug);
+            }
+        }
+        let featuredImageData;
+        let featuredImageMimeType;
+        if (file) {
+            featuredImageData = await (0, image_service_1.optimizeImage)(file.buffer);
+            featuredImageMimeType = "image/webp";
+        }
         return await prisma_1.prisma.blog.update({
             where: { id },
             data: {
                 ...rest,
+                featuredImageData: featuredImageData,
+                featuredImageMimeType,
                 publishedAt: publishedAt ? new Date(publishedAt) : undefined
             }
         });

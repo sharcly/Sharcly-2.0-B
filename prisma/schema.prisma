@@ -111,7 +111,6 @@ model Product {
   canonicalUrl    String?
   changefreq      String?          @default("monthly")
   discountable    Boolean          @default(true)
-  featured        Boolean          @default(false)
   height          Float?
   hsCode          String?
   keywords        String?
@@ -123,6 +122,7 @@ model Product {
   midCode         String?
   ogImage         String?
   options         Json?
+  featured        Boolean          @default(false)
   originCountry   String?
   status          ProductStatus    @default(DRAFT)
   subtitle        String?
@@ -294,7 +294,7 @@ model Review {
   comment   String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  product   Product  @relation(fields: [productId], references: [id])
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
   user      User     @relation(fields: [userId], references: [id])
 
   @@unique([productId, userId])
@@ -486,6 +486,7 @@ enum OrderStatus {
 enum ProductStatus {
   DRAFT
   PUBLISHED
+  ARCHIVED
 }
 
 enum BlogStatus {
@@ -579,14 +580,14 @@ model ContactMessage {
 }
 
 model Faq {
-  id        String   @id @default(uuid())
-  question  String
-  answer    String   @db.Text
-  category  String?
-  order     Int      @default(0)
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id          String   @id @default(uuid())
+  question    String
+  answer      String   @db.Text
+  category    String?
+  order       Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
 
   @@map("faqs")
 }

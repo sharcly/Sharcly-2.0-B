@@ -3,8 +3,9 @@ import { SeoService } from "./seo.service";
 
 export const getSeoBySlug = async (req: Request, res: Response) => {
   try {
-    const { slug } = req.params;
-    const seo = await SeoService.getSeoBySlug(slug as string);
+    const slug = req.params[0];
+    const finalSlug = Array.isArray(slug) ? slug.join('/') : slug;
+    const seo = await SeoService.getSeoBySlug(finalSlug as string);
     res.status(200).json({ success: true, seo });
   } catch (error: any) {
     res.status(500).json({ success: false, message: "Failed to fetch SEO data" });

@@ -39,7 +39,7 @@ export class OrderService {
         variantId: variant ? variant.id : undefined,
         price,
         name: product.name,
-        image: product.image
+        image: product.ogImage
       });
     }
 
@@ -198,16 +198,17 @@ export class OrderService {
           { orderId: order.id, userId: finalUserId }
         );
         clientSecret = paymentIntent.client_secret || undefined;
-      } catch (pErr) {
-        console.warn("Stripe Payment Intent Creation Failed:", pErr);
-        // We still created the order, but frontend will see error if no clientSecret
+      } catch (pErr: any) {
+        console.error("Stripe Payment Intent Creation Failed:", pErr);
+        // Throwing error here is critical so the user doesn't think the order was successful when payment failed to initiate
+        throw new Error(`Failed to initialize payment: ${pErr.message || "Stripe error"}`);
       }
     }
 
     // Klaviyo Tracking
     try {
       const seoSettings = await SeoService.getGlobalSettings();
-      KlaviyoService.init(seoSettings?.klaviyoPrivateKey);
+      KlaviyoService.init(seoSettings?.klaviyoPrivateKey || undefined);
       await KlaviyoService.trackEvent(email, "Placed Order", {
         "$value": Number(order.totalAmount),
         "OrderID": order.id,
@@ -226,7 +227,7 @@ export class OrderService {
       console.warn("Email Confirmation Failed:", eErr);
     }
 
-    return { ...order, clientSecret };
+    return { order, clientSecret };
   }
 
   static async getMyOrders(userId: string) {
@@ -246,7 +247,8 @@ export class OrderService {
         user: { select: { name: true, email: true } }, 
         items: { include: { product: true } } 
       },
-      orderBy: { createdAt: "desc" }
+      orderBy: { createdAt: "desc" },
+      take: 500 // Limit to prevent timeouts on massive datasets
     });
 
     const settings = await prisma.storeSettings.findFirst();
@@ -275,8 +277,15 @@ export class OrderService {
   private static applyLegacyFallback(order: any, settings: any) {
     if (!order) return order;
 
-    const itemsSubtotal = order.items.reduce((acc: number, item: any) => acc + (Number(item.price) * item.quantity), 0);
-    const total = Number(order.totalAmount);
+    // Defensive check: ensure items is an array
+    const items = order.items || [];
+    const itemsSubtotal = items.reduce((acc: number, item: any) => {
+      const price = Number(item.price) || 0;
+      const quantity = Number(item.quantity) || 0;
+      return acc + (price * quantity);
+    }, 0);
+
+    const total = Number(order.totalAmount) || 0;
     const recordedTax = Number(order.taxAmount || 0);
     const recordedShipping = Number(order.shippingAmount || 0);
 
@@ -332,7 +341,7 @@ export class OrderService {
 
     if (!order) throw new Error("Order not found");
     if (order.userId !== userId) throw new Error("Access denied");
-    if (![OrderStatus.PENDING, OrderStatus.CONFIRMED].includes(order.status)) {
+    if (!([OrderStatus.PENDING, OrderStatus.CONFIRMED] as OrderStatus[]).includes(order.status)) {
       throw new Error(`Order cannot be cancelled because it is already ${order.status.toLowerCase()}.`);
     }
 

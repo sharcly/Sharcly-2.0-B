@@ -7,6 +7,8 @@ exports.MarketingService = void 0;
 const prisma_1 = require("../../common/lib/prisma");
 const email_service_1 = require("../auth/email.service");
 const crypto_1 = __importDefault(require("crypto"));
+const klaviyo_service_1 = require("./klaviyo.service");
+const seo_service_1 = require("../seo/seo.service");
 class MarketingService {
     static async getActiveOffers() {
         return await prisma_1.prisma.welcomeOffer.findMany({
@@ -23,8 +25,15 @@ class MarketingService {
         return await prisma_1.prisma.welcomeOffer.create({
             data: {
                 title: data.title,
+                subtitle: data.subtitle,
                 description: data.description,
                 discount: data.discount,
+                discountType: data.discountType || "FIXED",
+                image: data.image,
+                options: data.options,
+                step2Title: data.step2Title,
+                step2Text: data.step2Text,
+                footerText: data.footerText,
                 isActive: data.isActive !== undefined ? data.isActive : true
             }
         });
@@ -62,7 +71,7 @@ class MarketingService {
             data: {
                 code: couponCode,
                 discount: offer.discount,
-                discountType: "PERCENTAGE",
+                discountType: offer.discountType,
                 expiryDate,
                 usageLimit: 1
             }
@@ -78,16 +87,77 @@ class MarketingService {
         });
         // 6. Send email
         try {
-            await (0, email_service_1.sendWelcomeCoupon)(email, couponCode, offer.discount.toString());
+            await (0, email_service_1.sendWelcomeCoupon)(email, couponCode, offer.discount.toString(), offer.discountType);
         }
         catch (error) {
             console.error("Failed to send welcome coupon email:", error);
+        }
+        // 7. Klaviyo Sync & Event Tracking
+        try {
+            const seoSettings = await seo_service_1.SeoService.getGlobalSettings();
+            klaviyo_service_1.KlaviyoService.init(seoSettings?.klaviyoPrivateKey || undefined);
+            // Sync Profile
+            await klaviyo_service_1.KlaviyoService.syncProfile({ email, phone });
+            // Track Event
+            await klaviyo_service_1.KlaviyoService.trackEvent(email, "Claimed Welcome Offer", {
+                "OfferTitle": offer.title,
+                "CouponCode": couponCode,
+                "Discount": offer.discount,
+                "DiscountType": offer.discountType
+            });
+        }
+        catch (kErr) {
+            console.warn("Klaviyo Offer Claim Tracking Failed:", kErr);
         }
         return claim;
     }
     static async getClaims() {
         return await prisma_1.prisma.offerClaim.findMany({
             include: { welcomeOffer: true },
+            orderBy: { createdAt: "desc" }
+        });
+    }
+    static async subscribeNewsletter(email) {
+        // 1. Check if already subscribed in local DB
+        const existingSubscriber = await prisma_1.prisma.newsletterSubscriber.findUnique({
+            where: { email }
+        });
+        if (existingSubscriber) {
+            if (existingSubscriber.isActive) {
+                throw new Error("You are already subscribed to our newsletter.");
+            }
+            else {
+                // Reactivate
+                await prisma_1.prisma.newsletterSubscriber.update({
+                    where: { email },
+                    data: { isActive: true }
+                });
+            }
+        }
+        else {
+            // Create new subscriber
+            await prisma_1.prisma.newsletterSubscriber.create({
+                data: { email }
+            });
+        }
+        // 2. Klaviyo Sync
+        try {
+            const seoSettings = await seo_service_1.SeoService.getGlobalSettings();
+            klaviyo_service_1.KlaviyoService.init(seoSettings?.klaviyoPrivateKey || undefined);
+            // Add to list
+            await klaviyo_service_1.KlaviyoService.subscribeToList(email);
+            // Track event
+            await klaviyo_service_1.KlaviyoService.trackEvent(email, "Subscribed to Newsletter", {
+                "Source": "Footer Community Form"
+            });
+        }
+        catch (kErr) {
+            console.warn("Klaviyo Newsletter Sync Failed:", kErr);
+        }
+        return { email, success: true };
+    }
+    static async getSubscribers() {
+        return await prisma_1.prisma.newsletterSubscriber.findMany({
             orderBy: { createdAt: "desc" }
         });
     }

@@ -103,7 +103,7 @@ export class MarketingService {
     // 7. Klaviyo Sync & Event Tracking
     try {
       const seoSettings = await SeoService.getGlobalSettings();
-      KlaviyoService.init(seoSettings?.klaviyoPrivateKey);
+      KlaviyoService.init(seoSettings?.klaviyoPrivateKey || undefined);
       
       // Sync Profile
       await KlaviyoService.syncProfile({ email, phone });
@@ -155,7 +155,7 @@ export class MarketingService {
     // 2. Klaviyo Sync
     try {
       const seoSettings = await SeoService.getGlobalSettings();
-      KlaviyoService.init(seoSettings?.klaviyoPrivateKey);
+      KlaviyoService.init(seoSettings?.klaviyoPrivateKey || undefined);
       
       // Add to list
       await KlaviyoService.subscribeToList(email);
