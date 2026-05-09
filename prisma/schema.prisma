@@ -138,6 +138,7 @@ model Product {
   reviews         Review[]
   collections     Collection[]     @relation("ProductCollections")
   wishlistedBy    User[]           @relation("UserWishlist")
+  flavours        Flavour[]        @relation("ProductFlavours")
 
   @@map("products")
 }
@@ -289,7 +290,7 @@ model Review {
   comment   String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  product   Product  @relation(fields: [productId], references: [id])
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
   user      User     @relation(fields: [userId], references: [id])
 
   @@unique([productId, userId])
@@ -572,6 +573,17 @@ model ProductToTag {
   @@id([A, B], map: "_ProductToTag_AB_pkey")
   @@index([B], map: "_ProductToTag_B_index")
   @@map("_ProductToTag")
+}
+
+model Flavour {
+  id        String    @id @default(uuid())
+  name      String    @unique
+  slug      String    @unique
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  products  Product[] @relation("ProductFlavours")
+
+  @@map("flavours")
 }
 
 enum DiscountType {

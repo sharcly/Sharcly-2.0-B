@@ -158,7 +158,7 @@ export const CreateProductSchema = z.object({
     .optional()
     .default(0),
   categoryId: z.string().uuid("Invalid category ID"),
-  status: z.enum(["DRAFT", "PUBLISHED"]).default("DRAFT"),
+  status: z.enum(["DRAFT", "PUBLISHED", "ARCHIVED"]).default("DRAFT"),
   discountable: z
     .union([z.boolean(), z.string()])
     .transform((val) => val === true || val === "true")

@@ -9,27 +9,56 @@ export const getImage = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     
-    // UUID validation
-    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id as string)) {
-      return res.status(400).json({ message: "Invalid image ID format" });
+    if (!id || id === "undefined" || id === "null") {
+      return res.status(400).json({ message: "Valid image ID is required" });
     }
 
-    let image = await prisma.productImage.findUnique({
-      where: { id: id as string }
-    }) as any;
+    // UUID validation - softened to allow non-standard IDs but still avoid Prisma errors if possible
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id as string);
 
-    // If not found in product images, check blog featured images
-    if (!image || !image.data) {
-      const blog = await prisma.blog.findUnique({
-        where: { id: id as string },
-        select: { featuredImageData: true, featuredImageMimeType: true }
+    let image: any = null;
+
+    if (isUUID) {
+      image = await prisma.productImage.findUnique({
+        where: { id: id as string }
       });
+    } else {
+      // If not a UUID, try to find by the 'url' field which might store filenames
+      image = await prisma.productImage.findFirst({
+        where: { url: id as string }
+      });
+    }
+
+    // If still not found in product images, check blog featured images
+    if (!image || !image.data) {
+      // Check blog by ID (if UUID)
+      if (isUUID) {
+        const blog = await prisma.blog.findUnique({
+          where: { id: id as string },
+          select: { featuredImageData: true, featuredImageMimeType: true }
+        });
+        
+        if (blog && blog.featuredImageData) {
+          image = {
+            data: blog.featuredImageData,
+            mimeType: blog.featuredImageMimeType
+          };
+        }
+      }
       
-      if (blog && blog.featuredImageData) {
-        image = {
-          data: blog.featuredImageData,
-          mimeType: blog.featuredImageMimeType
-        };
+      // If still not found, check blog by featuredImage filename
+      if (!image) {
+        const blog = await prisma.blog.findFirst({
+          where: { featuredImage: id as string },
+          select: { featuredImageData: true, featuredImageMimeType: true }
+        });
+        
+        if (blog && blog.featuredImageData) {
+          image = {
+            data: blog.featuredImageData,
+            mimeType: blog.featuredImageMimeType
+          };
+        }
       }
     }
 

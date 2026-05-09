@@ -26,6 +26,7 @@ export class ProductService {
           category: true,
           type: true,
           tags: true,
+          flavours: true,
           variants: true,
           images: { select: { id: true } }
         },
@@ -49,6 +50,7 @@ export class ProductService {
         category: true,
         type: true,
         tags: true,
+        flavours: true,
         variants: true,
         images: { select: { id: true } },
         reviews: { include: { user: { select: { name: true } } } }
@@ -222,5 +224,32 @@ export class ProductService {
   static async createType(typeData: any) {
     const { name } = typeData;
     return await prisma.productType.create({ data: { name } });
+  }
+
+  static async getFlavours() {
+    return await prisma.flavour.findMany({ 
+      orderBy: { name: "asc" },
+      include: { _count: { select: { products: true } } }
+    });
+  }
+
+  static async createFlavour(flavourData: any) {
+    const { name, slug } = flavourData;
+    const finalSlug = slug || name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+    return await prisma.flavour.create({
+      data: { name, slug: finalSlug }
+    });
+  }
+
+  static async updateFlavour(id: string, flavourData: any) {
+    const { name, slug } = flavourData;
+    return await prisma.flavour.update({
+      where: { id },
+      data: { name, slug }
+    });
+  }
+
+  static async deleteFlavour(id: string) {
+    return await prisma.flavour.delete({ where: { id } });
   }
 }
