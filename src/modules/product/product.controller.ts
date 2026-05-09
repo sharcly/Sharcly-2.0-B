@@ -4,19 +4,37 @@ import { ProductService } from "./product.service";
 
 export const getProducts = async (req: Request, res: Response) => {
   try {
-    const { category, search, sort, page = "1", limit = "10", featured } = req.query;
+    const { category, flavour, search, sort, page = "1", limit = "10", featured } = req.query;
 
     const pageNum = Math.max(1, parseInt(page as string) || 1);
     const limitNum = Math.min(Math.max(1, parseInt(limit as string) || 10), 100); // Cap at 100
     const skip = (pageNum - 1) * limitNum;
 
     const where: any = {};
-    if (featured === "true") where.featured = true;
+    if (featured === "true") {
+      where.OR = [
+        { featured: true },
+        { tags: { some: { name: "featured" } } }
+      ];
+    }
     if (category) where.category = { slug: category as string };
-    if (search) where.OR = [
-      { name: { contains: search as string, mode: "insensitive" } },
-      { description: { contains: search as string, mode: "insensitive" } }
-    ];
+    if (flavour) where.flavours = { some: { slug: flavour as string } };
+    if (search) {
+      const searchFilter = [
+        { name: { contains: search as string, mode: "insensitive" } },
+        { description: { contains: search as string, mode: "insensitive" } }
+      ];
+      if (where.OR) {
+        // If we already have a featured OR, we need to AND it with the search OR
+        where.AND = [
+          { OR: where.OR },
+          { OR: searchFilter }
+        ];
+        delete where.OR;
+      } else {
+        where.OR = searchFilter;
+      }
+    }
 
     const [products, total] = await Promise.all([
       prisma.product.findMany({
@@ -27,6 +45,7 @@ export const getProducts = async (req: Request, res: Response) => {
           category: true,
           type: true,
           tags: true,
+          flavours: true,
           variants: true,
           images: {
             orderBy: { order: "asc" },
@@ -70,6 +89,7 @@ export const getProductBySlug = async (req: Request, res: Response) => {
           orderBy: { order: "asc" },
           select: { id: true, isThumbnail: true, order: true, mimeType: true }
         },
+        flavours: true,
         reviews: { include: { user: { select: { name: true } } } }
       }
     });
@@ -93,7 +113,7 @@ export const getProductBySlug = async (req: Request, res: Response) => {
 export const createProduct = async (req: Request, res: Response) => {
   try {
     const {
-      name, subtitle, slug, sku, description, price, stock, categoryId, typeId, tags, collections,
+      name, subtitle, slug, sku, description, price, stock, categoryId, typeId, tags, collections, flavours,
       status, discountable, weight, length, height, width, originCountry, material, hsCode, midCode,
       metaTitle, metaDescription, keywords, canonicalUrl, ogImage, changefreq,
       options, metadata, variants, featured
@@ -107,7 +127,23 @@ export const createProduct = async (req: Request, res: Response) => {
 
     let tagsArray = [];
     if (tags) {
-      tagsArray = Array.isArray(tags) ? tags : (typeof tags === "string" ? JSON.parse(tags) : []);
+      try {
+        tagsArray = Array.isArray(tags) ? tags : (typeof tags === "string" ? JSON.parse(tags) : []);
+      } catch (e) { tagsArray = []; }
+    }
+
+    let collectionsArray = [];
+    if (collections) {
+      try {
+        collectionsArray = Array.isArray(collections) ? collections : (typeof collections === "string" ? JSON.parse(collections) : []);
+      } catch (e) { collectionsArray = []; }
+    }
+
+    let flavoursArray = [];
+    if (flavours) {
+      try {
+        flavoursArray = Array.isArray(flavours) ? flavours : (typeof flavours === "string" ? JSON.parse(flavours) : []);
+      } catch (e) { flavoursArray = []; }
     }
 
     const files = (req.files as any[]) || [];
@@ -191,12 +227,17 @@ export const createProduct = async (req: Request, res: Response) => {
         metadata: metadataData,
         featured: featured === "true" || featured === true,
         discountable: discountable === "true" || discountable === true,
-        collections: collections && Array.isArray(collections) ? {
-          connect: collections.map((id: string) => ({ id }))
+        collections: collectionsArray.length > 0 ? {
+          connect: collectionsArray.map((id: string) => ({ id }))
         } : undefined,
         tags: tagsArray.length > 0 ? {
           connect: tagsArray
             .filter((t: any) => typeof t === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i.test(t))
+            .map((id: string) => ({ id }))
+        } : undefined,
+        flavours: (flavoursArray && Array.isArray(flavoursArray)) ? {
+          connect: flavoursArray
+            .filter((f: any) => typeof f === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i.test(f))
             .map((id: string) => ({ id }))
         } : undefined,
         images: {
@@ -278,7 +319,8 @@ export const createProduct = async (req: Request, res: Response) => {
         type: true,
         tags: true,
         category: true,
-        collections: true
+        collections: true,
+        flavours: true
       }
     });
 
@@ -307,18 +349,61 @@ export const updateProduct = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const {
-      name, subtitle, slug, sku, description, price, stock, categoryId, typeId, tags, collections,
+      name, subtitle, slug, sku, description, price, stock, categoryId, typeId, tags, collections, flavours,
       status, discountable, weight, length, height, width, originCountry, material, hsCode, midCode,
       metaTitle, metaDescription, keywords, canonicalUrl, ogImage, changefreq,
       options, metadata, variants, featured, imageOrder
     } = req.body;
 
-    const tagsArray = tags ? (Array.isArray(tags) ? tags : (typeof tags === "string" ? JSON.parse(tags) : [])) : undefined;
-    const variantData = variants ? (typeof variants === "string" ? JSON.parse(variants) : variants) : undefined;
-    const optionsData = options ? (typeof options === "string" ? JSON.parse(options) : options) : undefined;
-    const metadataData = metadata ? (typeof metadata === "string" ? JSON.parse(metadata) : metadata) : undefined;
+    let tagsArray = undefined;
+    if (tags) {
+      try {
+        tagsArray = Array.isArray(tags) ? tags : (typeof tags === "string" ? JSON.parse(tags) : []);
+      } catch (e) { tagsArray = []; }
+    }
+
+    let collectionsArray = undefined;
+    if (collections) {
+      try {
+        collectionsArray = Array.isArray(collections) ? collections : (typeof collections === "string" ? JSON.parse(collections) : []);
+      } catch (e) { collectionsArray = []; }
+    }
+
+    let flavoursArray = undefined;
+    if (flavours) {
+      try {
+        flavoursArray = Array.isArray(flavours) ? flavours : (typeof flavours === "string" ? JSON.parse(flavours) : []);
+      } catch (e) { flavoursArray = []; }
+    }
+
+    let variantData = undefined;
+    if (variants) {
+      try {
+        variantData = typeof variants === "string" ? JSON.parse(variants) : variants;
+      } catch (e) { variantData = []; }
+    }
+
+    let optionsData = undefined;
+    if (options) {
+      try {
+        optionsData = typeof options === "string" ? JSON.parse(options) : options;
+      } catch (e) { optionsData = []; }
+    }
+
+    let metadataData = undefined;
+    if (metadata) {
+      try {
+        metadataData = typeof metadata === "string" ? JSON.parse(metadata) : metadata;
+      } catch (e) { metadataData = []; }
+    }
+
     const hasImageOrder = req.body.imageOrder !== undefined;
-    const imageOrderArray = hasImageOrder ? (typeof imageOrder === "string" ? JSON.parse(imageOrder) : imageOrder) : [];
+    let imageOrderArray = [];
+    if (hasImageOrder) {
+      try {
+        imageOrderArray = typeof imageOrder === "string" ? JSON.parse(imageOrder) : imageOrder;
+      } catch (e) { imageOrderArray = []; }
+    }
 
     const variantImagesMap = new Map();
 
@@ -423,15 +508,22 @@ export const updateProduct = async (req: Request, res: Response) => {
         changefreq,
         options: optionsData,
         metadata: metadataData,
-        featured: featured === "true" || featured === true || (featured === "false" || featured === false ? false : undefined),
+        featured: featured !== undefined ? (featured === "true" || featured === true) : undefined,
         discountable: discountable === "true" || discountable === true,
-        collections: collections && Array.isArray(collections) ? {
-          set: collections.map((id: string) => ({ id }))
+        collections: collectionsArray ? {
+          set: collectionsArray.map((id: string) => ({ id }))
         } : undefined,
         tags: tagsArray ? {
           set: tagsArray
             .filter((t: any) => typeof t === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i.test(t))
             .map((id: string) => ({ id }))
+        } : undefined,
+        flavours: (flavoursArray && Array.isArray(flavoursArray) && flavoursArray.length > 0) ? {
+          set: flavoursArray
+            .filter((f: any) => typeof f === "string" && f.length > 0)
+            .map((id: string) => ({ id }))
+        } : (flavoursArray && Array.isArray(flavoursArray) && flavoursArray.length === 0) ? {
+          set: []
         } : undefined,
         images: processedImages.length > 0 ? {
           create: processedImages
@@ -509,7 +601,8 @@ export const updateProduct = async (req: Request, res: Response) => {
         tags: true,
         category: true,
         collections: true,
-        type: true
+        type: true,
+        flavours: true
       }
     });
 
@@ -517,6 +610,7 @@ export const updateProduct = async (req: Request, res: Response) => {
 
     res.status(200).json({ 
       success: true, 
+      message: "Product updated successfully v2",
       product: {
         ...updatedProduct,
         price: Number(updatedProduct.price),
@@ -686,5 +780,43 @@ export const createType = async (req: Request, res: Response) => {
     res.status(201).json({ success: true, type });
   } catch (error) {
     res.status(500).json({ message: "Failed to create type" });
+  }
+};
+
+export const getFlavours = async (req: Request, res: Response) => {
+  try {
+    const flavours = await ProductService.getFlavours();
+    res.status(200).json({ success: true, flavours });
+  } catch (error) {
+    res.status(500).json({ message: "Failed to fetch flavours" });
+  }
+};
+
+export const createFlavour = async (req: Request, res: Response) => {
+  try {
+    const flavour = await ProductService.createFlavour(req.body);
+    res.status(201).json({ success: true, flavour });
+  } catch (error) {
+    res.status(500).json({ message: "Failed to create flavour" });
+  }
+};
+
+export const updateFlavour = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const flavour = await ProductService.updateFlavour(id as string, req.body);
+    res.status(200).json({ success: true, flavour });
+  } catch (error) {
+    res.status(500).json({ message: "Failed to update flavour" });
+  }
+};
+
+export const deleteFlavour = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    await ProductService.deleteFlavour(id as string);
+    res.status(200).json({ success: true, message: "Flavour deleted" });
+  } catch (error) {
+    res.status(500).json({ message: "Failed to delete flavour" });
   }
 };
