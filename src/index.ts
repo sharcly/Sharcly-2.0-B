@@ -18,6 +18,10 @@ import { bootstrap } from "./common/utils/bootstrap";
 import imageRouter from "./modules/image/image.router";
 import { BlogWorker } from "./modules/blog/blog.worker";
 // import { track } from "@vercel/analytics/server"; // Replaced with dynamic import below
+// Note: @vercel/speed-insights is installed but not used here as it's designed for
+// client-side (browser) performance monitoring. This is a backend API without HTML pages.
+// Speed Insights measures frontend metrics like Core Web Vitals, page load times, etc.
+// For backend monitoring, use @vercel/analytics (already integrated above).
 
 const app = express();
 const port = process.env.PORT || 5000;
