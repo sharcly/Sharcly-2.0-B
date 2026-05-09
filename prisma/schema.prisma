@@ -137,6 +137,7 @@ model Product {
   reviews         Review[]
   collections     Collection[]     @relation("ProductCollections")
   wishlistedBy    User[]           @relation("UserWishlist")
+  flavours        Flavour[]        @relation("ProductFlavours")
 
   @@map("products")
 }
@@ -590,4 +591,15 @@ model Faq {
   updatedAt   DateTime @updatedAt @map("updated_at")
 
   @@map("faqs")
+}
+
+model Flavour {
+  id        String    @id @default(uuid())
+  name      String    @unique
+  slug      String    @unique
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  products  Product[] @relation("ProductFlavours")
+
+  @@map("flavours")
 }
