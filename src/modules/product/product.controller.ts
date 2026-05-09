@@ -4,18 +4,38 @@ import { ProductService } from "./product.service";
 
 export const getProducts = async (req: Request, res: Response) => {
   try {
-    const { category, search, sort, page = "1", limit = "10" } = req.query;
+    const { category, search, sort, featured, page = "1", limit = "10" } = req.query;
 
     const pageNum = parseInt(page as string);
     const limitNum = parseInt(limit as string);
     const skip = (pageNum - 1) * limitNum;
 
     const where: any = {};
-    if (category) where.category = { slug: category as string };
-    if (search) where.OR = [
-      { name: { contains: search as string, mode: "insensitive" } },
-      { description: { contains: search as string, mode: "insensitive" } }
-    ];
+    const filters: any[] = [];
+
+    if (category) filters.push({ category: { slug: category as string } });
+    
+    if (featured === "true") {
+      filters.push({
+        OR: [
+          { featured: true },
+          { tags: { some: { name: "featured" } } }
+        ]
+      });
+    }
+
+    if (search) {
+      filters.push({
+        OR: [
+          { name: { contains: search as string, mode: "insensitive" } },
+          { description: { contains: search as string, mode: "insensitive" } }
+        ]
+      });
+    }
+
+    if (filters.length > 0) {
+      where.AND = filters;
+    }
 
     const [products, total] = await Promise.all([
       prisma.product.findMany({
@@ -95,7 +115,7 @@ export const createProduct = async (req: Request, res: Response) => {
       name, subtitle, slug, sku, description, price, stock, categoryId, typeId, tags, collections,
       status, discountable, weight, length, height, width, originCountry, material, hsCode, midCode,
       metaTitle, metaDescription, keywords, canonicalUrl, ogImage, changefreq,
-      options, metadata, variants
+      options, metadata, variants, featured
     } = req.body;
 
     if (!categoryId) {
@@ -204,6 +224,7 @@ export const createProduct = async (req: Request, res: Response) => {
         options: optionsData,
         metadata: metadataData,
         discountable: discountable === "true" || discountable === true,
+        featured: featured === "true" || featured === true,
         collections: collections && Array.isArray(collections) ? {
           connect: collections.map((id: string) => ({ id }))
         } : undefined,
@@ -281,7 +302,7 @@ export const updateProduct = async (req: Request, res: Response) => {
       name, subtitle, slug, sku, description, price, stock, categoryId, typeId, tags, collections,
       status, discountable, weight, length, height, width, originCountry, material, hsCode, midCode,
       metaTitle, metaDescription, keywords, canonicalUrl, ogImage, changefreq,
-      options, metadata, variants
+      options, metadata, variants, featured
     } = req.body;
 
     const tagsArray = tags ? (Array.isArray(tags) ? tags : (typeof tags === "string" ? JSON.parse(tags) : [])) : undefined;
@@ -357,6 +378,7 @@ export const updateProduct = async (req: Request, res: Response) => {
         options: optionsData,
         metadata: metadataData,
         discountable: discountable === "true" || discountable === true,
+        featured: featured !== undefined ? (featured === "true" || featured === true) : undefined,
         collections: collections && Array.isArray(collections) ? {
           set: collections.map((id: string) => ({ id }))
         } : undefined,
