@@ -109,41 +109,139 @@ export const sendOrderConfirmation = async (email: string, orderDetails: any) =>
 export const sendOrderStatusUpdate = async (email: string, order: any) => {
   if (!resend) return;
 
+  // Delegate to specific functions for major status changes
+  if (order.status === "SHIPPED") {
+    return await sendShippingNotificationEmail(email, order);
+  }
+  if (order.status === "CANCELLED") {
+    return await sendOrderCancellationEmail(email, order, order.cancelReason || "Customer request");
+  }
+  if (order.status === "DELIVERED") {
+    return await sendOrderDeliveredEmail(email, order);
+  }
+
   try {
     let attachments: any[] = [];
+    let statusMessage = "We're working on your order.";
+    let statusTitle = `Order Status: ${order.status}`;
+
     if (order.status === "CONFIRMED") {
+      statusMessage = "Your payment has been verified and your order is now confirmed.";
+      statusTitle = "Order Confirmed";
       const invoiceBuffer = await InvoiceService.generateInvoiceBuffer(order);
       attachments.push({
         filename: `invoice-${order.id.slice(0, 8)}.pdf`,
         content: invoiceBuffer,
       });
+    } else if (order.status === "PREPARING") {
+      statusMessage = "Our team is carefully picking and packing your items. We'll let you know once it's ready for shipment.";
+      statusTitle = "Preparing Your Order";
     }
 
     await resend.emails.send({
       from: fromEmail,
       to: email,
-      subject: `Order Update - #${order.id.slice(0, 8)}: ${order.status}`,
+      subject: `Update on Order #${order.id.slice(0, 8)}: ${order.status}`,
       attachments,
       html: baseTemplate(
-        "Order Status Updated",
+        statusTitle,
         `
-        <p>Your order <strong>#${order.id.slice(0, 8)}</strong> has a new update.</p>
-        <div style="background: #f4fdf4; padding: 24px; border-radius: 16px; margin: 20px 0; border: 1px solid #e0f2e0;">
-          <p style="margin: 0; color: #062D1B; font-weight: 700; font-size: 18px;">${order.status}</p>
+        <p>There's a new update on your order <strong>#${order.id.slice(0, 8)}</strong>.</p>
+        <div style="background: #f9f9f9; padding: 24px; border-radius: 16px; margin: 20px 0; border: 1px solid #eee; text-align: center;">
+          <p style="margin: 0; color: #062D1B; font-weight: 700; font-size: 18px; text-transform: uppercase;">${order.status}</p>
         </div>
-        ${order.trackingNumber ? `
-          <div style="text-align: left; margin: 20px 0; padding: 15px; background: #f9f9f9; border-radius: 12px;">
-            <p style="margin: 5px 0;"><strong>Tracking Number:</strong> ${order.trackingNumber}</p>
-            <p style="margin: 5px 0;"><strong>Carrier:</strong> ${order.carrier}</p>
-          </div>
-        ` : ""}
-        <p>Click the button below to see the full details of your order.</p>
+        <p style="text-align: center; color: #666;">${statusMessage}</p>
         `,
-        { text: "Track My Order", url: `${process.env.FRONTEND_URL}/account` }
+        { text: "View Order Details", url: `${process.env.FRONTEND_URL}/account` }
       ),
     });
   } catch (error) {
     console.error("Failed to send order status update email:", error);
+  }
+};
+
+export const sendShippingNotificationEmail = async (email: string, order: any) => {
+  if (!resend) return;
+
+  try {
+    await resend.emails.send({
+      from: fromEmail,
+      to: email,
+      subject: `Your order #${order.id.slice(0, 8)} has shipped!`,
+      html: baseTemplate(
+        "Your Order is on its way!",
+        `
+        <p>Great news! Your order <strong>#${order.id.slice(0, 8)}</strong> has been shipped and is heading your way.</p>
+        <div style="background: #f4fdf4; padding: 24px; border-radius: 16px; margin: 20px 0; border: 1px solid #e0f2e0;">
+          <p style="margin: 0; color: #062D1B; font-weight: 700; font-size: 18px; text-align: center;">SHIPPED</p>
+        </div>
+        <div style="text-align: left; margin: 24px 0; padding: 20px; background: #f9f9f9; border-radius: 16px; border: 1px solid #eee;">
+          <h3 style="margin-top: 0; color: #062D1B; font-size: 14px; text-transform: uppercase; letter-spacing: 1px;">Delivery Info</h3>
+          ${order.trackingNumber ? `<p style="margin: 8px 0; font-size: 14px;"><strong>Tracking Number:</strong> ${order.trackingNumber}</p>` : ""}
+          ${order.carrier ? `<p style="margin: 8px 0; font-size: 14px;"><strong>Carrier:</strong> ${order.carrier}</p>` : ""}
+          <p style="margin: 8px 0; font-size: 14px;"><strong>Shipping To:</strong> ${order.address || order.shippingAddress}</p>
+        </div>
+        <p>You can track your package's progress by clicking the button below.</p>
+        `,
+        { text: "Track Package", url: `${process.env.FRONTEND_URL}/account` }
+      ),
+    });
+  } catch (error) {
+    console.error("Failed to send shipping notification email:", error);
+  }
+};
+
+export const sendOrderCancellationEmail = async (email: string, order: any, reason: string) => {
+  if (!resend) return;
+
+  try {
+    await resend.emails.send({
+      from: fromEmail,
+      to: email,
+      subject: `Order Cancelled - #${order.id.slice(0, 8)}`,
+      html: baseTemplate(
+        "Order Cancellation",
+        `
+        <p>Your order <strong>#${order.id.slice(0, 8)}</strong> has been cancelled.</p>
+        <div style="background: #fff5f5; padding: 24px; border-radius: 16px; margin: 20px 0; border: 1px solid #fed7d7;">
+          <p style="margin: 0; color: #c53030; font-weight: 700; font-size: 18px; text-align: center;">CANCELLED</p>
+        </div>
+        <div style="text-align: left; margin: 24px 0; padding: 20px; background: #f9f9f9; border-radius: 16px; border: 1px solid #eee;">
+          <p style="margin: 0; font-size: 14px;"><strong>Reason for cancellation:</strong> ${reason}</p>
+        </div>
+        <p>If you have already been charged, a refund will be processed automatically within 5-10 business days. We apologize for any inconvenience.</p>
+        `,
+        { text: "Visit Store", url: `${process.env.FRONTEND_URL}/products` }
+      ),
+    });
+  } catch (error) {
+    console.error("Failed to send cancellation email:", error);
+  }
+};
+
+export const sendOrderDeliveredEmail = async (email: string, order: any) => {
+  if (!resend) return;
+
+  try {
+    await resend.emails.send({
+      from: fromEmail,
+      to: email,
+      subject: `Delivered: Your Sharcly order #${order.id.slice(0, 8)}`,
+      html: baseTemplate(
+        "Order Delivered!",
+        `
+        <p>Your order <strong>#${order.id.slice(0, 8)}</strong> has been delivered. We hope you love your natural wellness essentials!</p>
+        <div style="background: #f4fdf4; padding: 24px; border-radius: 16px; margin: 20px 0; border: 1px solid #e0f2e0;">
+          <p style="margin: 0; color: #062D1B; font-weight: 700; font-size: 18px; text-align: center;">DELIVERED</p>
+        </div>
+        <p>If you have any issues with your delivery or the products, please reply to this email or contact our support team.</p>
+        <p><strong>Loved your experience?</strong> We'd love to hear your feedback.</p>
+        `,
+        { text: "Write a Review", url: `${process.env.FRONTEND_URL}/products` }
+      ),
+    });
+  } catch (error) {
+    console.error("Failed to send delivery email:", error);
   }
 };
 

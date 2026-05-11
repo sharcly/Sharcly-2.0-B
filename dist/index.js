@@ -37,11 +37,14 @@ const allowedOrigins = [
 ].filter(Boolean);
 const corsOptions = {
     origin: (origin, callback) => {
+        // Allow non-browser requests (like mobile apps or curl)
         if (!origin)
             return callback(null, true);
         const normalizedOrigin = origin.replace(/\/$/, "").toLowerCase();
+        // Check against explicit allowed list
         const isAllowed = allowedOrigins.some(o => o.toLowerCase().replace(/\/$/, "") === normalizedOrigin);
-        const isVercel = normalizedOrigin.endsWith(".vercel.app") || normalizedOrigin.includes("sharcly");
+        // Allow all Vercel subdomains that contain 'sharcly' (previews, branches, etc.)
+        const isVercel = normalizedOrigin.endsWith(".vercel.app") && normalizedOrigin.includes("sharcly");
         if (isAllowed || isVercel) {
             callback(null, true);
         }
@@ -52,7 +55,16 @@ const corsOptions = {
     },
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept", "X-CSRF-Token", "X-Api-Version"],
+    allowedHeaders: [
+        "Content-Type",
+        "Authorization",
+        "X-Requested-With",
+        "Accept",
+        "X-CSRF-Token",
+        "X-Api-Version",
+        "sentry-trace",
+        "baggage"
+    ],
     exposedHeaders: ["set-cookie"],
     optionsSuccessStatus: 200,
     maxAge: 86400

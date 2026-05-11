@@ -28,8 +28,6 @@ export const register = async (req: Request, res: Response) => {
 
     res.status(201).json({
       success: true,
-      accessToken: result.tokens.accessToken,
-      refreshToken: result.tokens.refreshToken,
       user: result.user,
     });
   } catch (error: any) {
@@ -78,8 +76,6 @@ export const login = async (req: Request, res: Response) => {
 
     res.status(200).json({
       success: true,
-      accessToken: result.tokens.accessToken,
-      refreshToken: result.tokens.refreshToken,
       user: result.user,
     });
   } catch (error: any) {
@@ -116,7 +112,6 @@ export const refreshTokens = async (req: Request, res: Response) => {
 
     res.status(200).json({
       success: true,
-      ...tokens
     });
   } catch (error: any) {
     console.error("[Auth] Refresh token failed:", error.message);

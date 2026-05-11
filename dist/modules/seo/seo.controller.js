@@ -4,8 +4,9 @@ exports.getRobots = exports.getSitemap = exports.updateGlobalSeo = exports.getGl
 const seo_service_1 = require("./seo.service");
 const getSeoBySlug = async (req, res) => {
     try {
-        const { slug } = req.params;
-        const seo = await seo_service_1.SeoService.getSeoBySlug(slug);
+        const slug = req.params[0];
+        const finalSlug = Array.isArray(slug) ? slug.join('/') : slug;
+        const seo = await seo_service_1.SeoService.getSeoBySlug(finalSlug);
         res.status(200).json({ success: true, seo });
     }
     catch (error) {

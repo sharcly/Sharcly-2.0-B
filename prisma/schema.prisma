@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider  = "postgresql"
+  provider = "postgresql"
 }
 
 model Role {
@@ -54,13 +54,14 @@ model User {
   refreshToken      String?   @unique
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
-  addresses         Address[]
+  stripeCustomerId  String?
+  cart              Json?
   blogs             Blog[]
+  addresses         Address[]
   orders            Order[]
   reviews           Review[]
   userRole          Role?     @relation(fields: [roleId], references: [id])
   wishlist          Product[] @relation("UserWishlist")
-  stripeCustomerId  String?
 
   @@map("users")
 }
@@ -122,13 +123,13 @@ model Product {
   midCode         String?
   ogImage         String?
   options         Json?
-  featured        Boolean          @default(false)
   originCountry   String?
   status          ProductStatus    @default(DRAFT)
   subtitle        String?
   weight          Float?
   width           Float?
-  tags            ProductTag[]     @relation("ProductToTag")
+  featured        Boolean          @default(false)
+  ProductToTag    ProductToTag[]
   orderItems      OrderItem[]
   images          ProductImage[]
   variants        ProductVariant[]
@@ -190,9 +191,9 @@ model Order {
   carrier           String?
   estimatedDelivery DateTime?
   notes             String?
-  cancelReason      String?
   createdAt         DateTime    @default(now())
   updatedAt         DateTime    @updatedAt
+  cancelReason      String?
   items             OrderItem[]
   coupon            Coupon?     @relation(fields: [couponId], references: [id])
   user              User        @relation(fields: [userId], references: [id])
@@ -213,30 +214,25 @@ model OrderItem {
 }
 
 model Blog {
-  id              String     @id @default(uuid())
-  title           String
-  slug            String     @unique
-  content         String
-  authorId        String
-  metaTitle       String?
-  createdAt       DateTime   @default(now())
-  updatedAt       DateTime   @updatedAt
-  category        String?
-  excerpt         String?
-  featuredImage   String?
-  featuredImageData Bytes?
+  id                    String     @id @default(uuid())
+  title                 String
+  slug                  String     @unique
+  content               String
+  authorId              String
+  metaTitle             String?
+  createdAt             DateTime   @default(now())
+  updatedAt             DateTime   @updatedAt
+  category              String?
+  excerpt               String?
+  featuredImage         String?
+  keywords              String?
+  metaDescription       String?
+  publishedAt           DateTime?
+  status                BlogStatus @default(DRAFT)
+  tags                  String[]
+  featuredImageData     Bytes?
   featuredImageMimeType String?
-  keywords        String?
-  metaDescription String?
-  publishedAt     DateTime?
-  status          BlogStatus @default(DRAFT)
-  tags            String[]
-  author          User       @relation(fields: [authorId], references: [id])
-}
-
-enum DiscountType {
-  PERCENTAGE
-  FIXED
+  author                User       @relation(fields: [authorId], references: [id])
 }
 
 model Coupon {
@@ -255,21 +251,21 @@ model Coupon {
 }
 
 model WelcomeOffer {
-  id          String   @id @default(uuid())
-  title       String
-  subtitle    String?
-  description String
-  discount    Decimal
-  discountType String  @default("FIXED")
-  image       String?
-  options     Json?
-  step2Title  String?
-  step2Text   String?
-  footerText  String?
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  claims      OfferClaim[]
+  id           String       @id @default(uuid())
+  title        String
+  description  String
+  discount     Decimal
+  isActive     Boolean      @default(true)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  discountType String       @default("FIXED")
+  footerText   String?
+  image        String?
+  options      Json?
+  step2Text    String?
+  step2Title   String?
+  subtitle     String?
+  claims       OfferClaim[]
 
   @@map("welcome_offers")
 }
@@ -285,7 +281,6 @@ model OfferClaim {
 
   @@map("offer_claims")
 }
-
 
 model Review {
   id        String   @id @default(uuid())
@@ -387,7 +382,7 @@ model ProductTag {
   id           String         @id @default(uuid())
   name         String         @unique
   createdAt    DateTime       @default(now())
-  products     Product[]      @relation("ProductToTag")
+  ProductToTag ProductToTag[]
 
   @@map("product_tags")
 }
@@ -472,30 +467,6 @@ model ShippingRate {
   @@map("shipping_rates")
 }
 
-/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
-
-
-enum OrderStatus {
-  PENDING
-  CONFIRMED
-  PREPARING
-  SHIPPED
-  DELIVERED
-  CANCELLED
-}
-
-enum ProductStatus {
-  DRAFT
-  PUBLISHED
-  ARCHIVED
-}
-
-enum BlogStatus {
-  DRAFT
-  PUBLISHED
-  SCHEDULED
-}
-
 model WholesaleInquiry {
   id              String   @id @default(uuid())
   businessName    String   @map("business_name")
@@ -527,7 +498,7 @@ model Testimonial {
   name      String
   role      String
   company   String?
-  message   String   @db.Text
+  message   String
   rating    Int?
   image     String?
   featured  Boolean  @default(false)
@@ -581,16 +552,27 @@ model ContactMessage {
 }
 
 model Faq {
-  id          String   @id @default(uuid())
-  question    String
-  answer      String   @db.Text
-  category    String?
-  order       Int      @default(0)
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  id        String   @id @default(uuid())
+  question  String
+  answer    String
+  category  String?
+  order     Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("faqs")
+}
+
+model ProductToTag {
+  A            String
+  B            String
+  products     Product    @relation(fields: [A], references: [id], onDelete: Cascade)
+  product_tags ProductTag @relation(fields: [B], references: [id], onDelete: Cascade)
+
+  @@id([A, B], map: "_ProductToTag_AB_pkey")
+  @@index([B], map: "_ProductToTag_B_index")
+  @@map("_ProductToTag")
 }
 
 model Flavour {
@@ -602,4 +584,30 @@ model Flavour {
   products  Product[] @relation("ProductFlavours")
 
   @@map("flavours")
+}
+
+enum DiscountType {
+  PERCENTAGE
+  FIXED
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PREPARING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
+enum ProductStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum BlogStatus {
+  DRAFT
+  PUBLISHED
+  SCHEDULED
 }

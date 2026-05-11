@@ -346,6 +346,7 @@ export class OrderService {
     }
 
     return await prisma.$transaction(async (tx: any) => {
+      // 1. Update Order Status
       const updatedOrder = await tx.order.update({
         where: { id },
         data: { 
@@ -354,15 +355,36 @@ export class OrderService {
         }
       });
 
-      // Restore stock
+      // 2. Restore stock
       for (const item of order.items) {
-        // We need to check if it was a variant or base product
-        // OrderItem only has productId. In a better schema we'd have variantId in OrderItem.
-        // For now, let's look at the product stock.
         await tx.product.update({
           where: { id: item.productId },
           data: { stock: { increment: item.quantity } }
         });
+      }
+
+      // 3. Handle Refund if applicable
+      if (order.paymentMethod === 'online' && order.status === OrderStatus.CONFIRMED) {
+        try {
+          await PaymentService.refundOrder(id);
+        } catch (rErr: any) {
+          console.error(`[CANCEL_ORDER] Refund failed for order ${id}:`, rErr.message);
+          // We might want to still allow cancellation even if refund fails, 
+          // but usually it's better to fail the request so the admin knows something went wrong.
+          // For now, let's throw to ensure the transaction rolls back or at least the error is visible.
+          throw rErr; 
+        }
+      }
+
+      // 4. Send Cancellation Email
+      try {
+        const { sendOrderStatusUpdate } = require("../auth/email.service");
+        const user = await tx.user.findUnique({ where: { id: userId }, select: { email: true } });
+        if (user) {
+          await sendOrderStatusUpdate(user.email, updatedOrder);
+        }
+      } catch (eErr) {
+        console.warn("Cancellation Email Failed:", eErr);
       }
 
       return updatedOrder;

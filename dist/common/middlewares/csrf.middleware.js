@@ -47,7 +47,8 @@ const csrfProtection = (req, res, next) => {
         "/api/wholesale/inquiries",
         "/api/shipping/calculate",
         "/api/coupon/validate",
-        "/api/marketing/subscribe"
+        "/api/marketing/subscribe",
+        "/api/payments/webhook"
     ];
     const isSafeMethod = safeMethods.includes(req.method);
     const isSkippedRoute = skipRoutes.some(route => req.originalUrl.includes(route));

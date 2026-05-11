@@ -12,8 +12,8 @@ const createOrder = async (req, res) => {
         if (!email) {
             return res.status(400).json({ message: "Email is required to place an order" });
         }
-        const order = await order_service_1.OrderService.createOrder(userId, email, orderData);
-        res.status(201).json({ success: true, order });
+        const { order, clientSecret } = await order_service_1.OrderService.createOrder(userId, email, orderData);
+        res.status(201).json({ success: true, order, clientSecret });
     }
     catch (error) {
         res.status(400).json({ message: error.message || "Order placement failed" });
@@ -48,7 +48,10 @@ const getAllOrders = async (req, res) => {
     }
     catch (error) {
         console.error("Fetch all orders error:", error);
-        res.status(500).json({ message: "Failed to fetch all orders" });
+        res.status(500).json({
+            message: "Failed to fetch all orders",
+            error: error.message
+        });
     }
 };
 exports.getAllOrders = getAllOrders;

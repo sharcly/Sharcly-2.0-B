@@ -20,11 +20,7 @@ class StatsService {
             }),
             prisma_1.prisma.order.count(),
             // Simple "Active Now" estimate: users who created something or registered in the last hour
-            prisma_1.prisma.user.count({
-                where: {
-                    createdAt: { gte: new Date(Date.now() - 60 * 60 * 1000) }
-                }
-            })
+            prisma_1.prisma.product.count()
         ]);
         const totalRevenue = totalRevenueResult._sum.totalAmount || 0;
         // 2. Revenue Graph Data (Last 7 days)
@@ -77,7 +73,7 @@ class StatsService {
                 totalRevenue,
                 activeCustomers: customerCount,
                 totalOrders,
-                activeNow: activeNow + 5
+                activeNow
             },
             chartData,
             recentTransactions: recentTransactions.map((t) => ({

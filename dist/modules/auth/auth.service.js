@@ -35,9 +35,10 @@ class AuthService {
         if (existingUser) {
             throw new Error("User already exists");
         }
-        // Verify OTP
+        // Verify OTP — compare hashed value
         const otpRecord = await prisma_1.prisma.otp.findUnique({ where: { email } });
-        if (!otpRecord || otpRecord.code !== otp || otpRecord.expiresAt < new Date()) {
+        const hashedInputOtp = crypto_1.default.createHash("sha256").update(otp).digest("hex");
+        if (!otpRecord || otpRecord.code !== hashedInputOtp || otpRecord.expiresAt < new Date()) {
             throw new Error("Invalid or expired verification code.");
         }
         const hashedPassword = await bcryptjs_1.default.hash(password, 10);
@@ -98,10 +99,12 @@ class AuthService {
         }
         const code = crypto_1.default.randomInt(100000, 999999).toString();
         const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+        // Hash OTP before storing — never store plain-text OTPs in DB
+        const hashedCode = crypto_1.default.createHash("sha256").update(code).digest("hex");
         await prisma_1.prisma.otp.upsert({
             where: { email },
-            update: { code, expiresAt },
-            create: { email, code, expiresAt }
+            update: { code: hashedCode, expiresAt },
+            create: { email, code: hashedCode, expiresAt }
         });
         try {
             await (0, email_service_1.sendOtpEmail)(email, code);
