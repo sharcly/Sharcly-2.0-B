@@ -129,7 +129,7 @@ model Product {
   weight          Float?
   width           Float?
   featured        Boolean          @default(false)
-  ProductToTag    ProductToTag[]
+  tags            ProductTag[]     @relation("ProductToTag")
   orderItems      OrderItem[]
   images          ProductImage[]
   variants        ProductVariant[]
@@ -382,7 +382,7 @@ model ProductTag {
   id           String         @id @default(uuid())
   name         String         @unique
   createdAt    DateTime       @default(now())
-  ProductToTag ProductToTag[]
+  products     Product[]      @relation("ProductToTag")
 
   @@map("product_tags")
 }
@@ -564,16 +564,6 @@ model Faq {
   @@map("faqs")
 }
 
-model ProductToTag {
-  A            String
-  B            String
-  products     Product    @relation(fields: [A], references: [id], onDelete: Cascade)
-  product_tags ProductTag @relation(fields: [B], references: [id], onDelete: Cascade)
-
-  @@id([A, B], map: "_ProductToTag_AB_pkey")
-  @@index([B], map: "_ProductToTag_B_index")
-  @@map("_ProductToTag")
-}
 
 model Flavour {
   id        String    @id @default(uuid())
