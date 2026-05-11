@@ -181,8 +181,9 @@ class OrderService {
                 clientSecret = paymentIntent.client_secret || undefined;
             }
             catch (pErr) {
-                console.warn("Stripe Payment Intent Creation Failed:", pErr);
-                // We still created the order, but frontend will see error if no clientSecret
+                console.error("Stripe Payment Intent Creation Failed:", pErr);
+                // Throwing error here is critical so the user doesn't think the order was successful when payment failed to initiate
+                throw new Error(`Failed to initialize payment: ${pErr.message || "Stripe error"}`);
             }
         }
         // Klaviyo Tracking
@@ -207,7 +208,7 @@ class OrderService {
         catch (eErr) {
             console.warn("Email Confirmation Failed:", eErr);
         }
-        return { ...order, clientSecret };
+        return { order, clientSecret };
     }
     static async getMyOrders(userId) {
         const orders = await prisma_1.prisma.order.findMany({
@@ -224,7 +225,8 @@ class OrderService {
                 user: { select: { name: true, email: true } },
                 items: { include: { product: true } }
             },
-            orderBy: { createdAt: "desc" }
+            orderBy: { createdAt: "desc" },
+            take: 500 // Limit to prevent timeouts on massive datasets
         });
         const settings = await prisma_1.prisma.storeSettings.findFirst();
         return orders.map((order) => this.applyLegacyFallback(order, settings));
@@ -249,8 +251,14 @@ class OrderService {
     static applyLegacyFallback(order, settings) {
         if (!order)
             return order;
-        const itemsSubtotal = order.items.reduce((acc, item) => acc + (Number(item.price) * item.quantity), 0);
-        const total = Number(order.totalAmount);
+        // Defensive check: ensure items is an array
+        const items = order.items || [];
+        const itemsSubtotal = items.reduce((acc, item) => {
+            const price = Number(item.price) || 0;
+            const quantity = Number(item.quantity) || 0;
+            return acc + (price * quantity);
+        }, 0);
+        const total = Number(order.totalAmount) || 0;
         const recordedTax = Number(order.taxAmount || 0);
         const recordedShipping = Number(order.shippingAmount || 0);
         if (recordedTax === 0 && recordedShipping === 0 && total > itemsSubtotal && settings) {
@@ -304,6 +312,7 @@ class OrderService {
             throw new Error(`Order cannot be cancelled because it is already ${order.status.toLowerCase()}.`);
         }
         return await prisma_1.prisma.$transaction(async (tx) => {
+            // 1. Update Order Status
             const updatedOrder = await tx.order.update({
                 where: { id },
                 data: {
@@ -311,15 +320,36 @@ class OrderService {
                     cancelReason
                 }
             });
-            // Restore stock
+            // 2. Restore stock
             for (const item of order.items) {
-                // We need to check if it was a variant or base product
-                // OrderItem only has productId. In a better schema we'd have variantId in OrderItem.
-                // For now, let's look at the product stock.
                 await tx.product.update({
                     where: { id: item.productId },
                     data: { stock: { increment: item.quantity } }
                 });
+            }
+            // 3. Handle Refund if applicable
+            if (order.paymentMethod === 'online' && order.status === client_1.OrderStatus.CONFIRMED) {
+                try {
+                    await payment_service_1.PaymentService.refundOrder(id);
+                }
+                catch (rErr) {
+                    console.error(`[CANCEL_ORDER] Refund failed for order ${id}:`, rErr.message);
+                    // We might want to still allow cancellation even if refund fails, 
+                    // but usually it's better to fail the request so the admin knows something went wrong.
+                    // For now, let's throw to ensure the transaction rolls back or at least the error is visible.
+                    throw rErr;
+                }
+            }
+            // 4. Send Cancellation Email
+            try {
+                const { sendOrderStatusUpdate } = require("../auth/email.service");
+                const user = await tx.user.findUnique({ where: { id: userId }, select: { email: true } });
+                if (user) {
+                    await sendOrderStatusUpdate(user.email, updatedOrder);
+                }
+            }
+            catch (eErr) {
+                console.warn("Cancellation Email Failed:", eErr);
             }
             return updatedOrder;
         });

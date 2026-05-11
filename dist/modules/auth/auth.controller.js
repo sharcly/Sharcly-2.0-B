@@ -26,8 +26,6 @@ const register = async (req, res) => {
         });
         res.status(201).json({
             success: true,
-            accessToken: result.tokens.accessToken,
-            refreshToken: result.tokens.refreshToken,
             user: result.user,
         });
     }
@@ -77,8 +75,6 @@ const login = async (req, res) => {
         });
         res.status(200).json({
             success: true,
-            accessToken: result.tokens.accessToken,
-            refreshToken: result.tokens.refreshToken,
             user: result.user,
         });
     }
@@ -111,7 +107,6 @@ const refreshTokens = async (req, res) => {
         });
         res.status(200).json({
             success: true,
-            ...tokens
         });
     }
     catch (error) {

@@ -9,24 +9,50 @@ const prisma_1 = require("../../common/lib/prisma");
 const getImage = async (req, res) => {
     try {
         const { id } = req.params;
-        // UUID validation
-        if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
-            return res.status(400).json({ message: "Invalid image ID format" });
+        if (!id || id === "undefined" || id === "null") {
+            return res.status(400).json({ message: "Valid image ID is required" });
         }
-        let image = await prisma_1.prisma.productImage.findUnique({
-            where: { id: id }
-        });
-        // If not found in product images, check blog featured images
-        if (!image || !image.data) {
-            const blog = await prisma_1.prisma.blog.findUnique({
-                where: { id: id },
-                select: { featuredImageData: true, featuredImageMimeType: true }
+        // UUID validation - softened to allow non-standard IDs but still avoid Prisma errors if possible
+        const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+        let image = null;
+        if (isUUID) {
+            image = await prisma_1.prisma.productImage.findUnique({
+                where: { id: id }
             });
-            if (blog && blog.featuredImageData) {
-                image = {
-                    data: blog.featuredImageData,
-                    mimeType: blog.featuredImageMimeType
-                };
+        }
+        else {
+            // If not a UUID, try to find by the 'url' field which might store filenames
+            image = await prisma_1.prisma.productImage.findFirst({
+                where: { url: id }
+            });
+        }
+        // If still not found in product images, check blog featured images
+        if (!image || !image.data) {
+            // Check blog by ID (if UUID)
+            if (isUUID) {
+                const blog = await prisma_1.prisma.blog.findUnique({
+                    where: { id: id },
+                    select: { featuredImageData: true, featuredImageMimeType: true }
+                });
+                if (blog && blog.featuredImageData) {
+                    image = {
+                        data: blog.featuredImageData,
+                        mimeType: blog.featuredImageMimeType
+                    };
+                }
+            }
+            // If still not found, check blog by featuredImage filename
+            if (!image) {
+                const blog = await prisma_1.prisma.blog.findFirst({
+                    where: { featuredImage: id },
+                    select: { featuredImageData: true, featuredImageMimeType: true }
+                });
+                if (blog && blog.featuredImageData) {
+                    image = {
+                        data: blog.featuredImageData,
+                        mimeType: blog.featuredImageMimeType
+                    };
+                }
             }
         }
         if (!image || !image.data) {

@@ -1,24 +1,42 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.createType = exports.getTypes = exports.createTag = exports.getTags = exports.deleteCollection = exports.updateCollection = exports.createCollection = exports.getCollectionBySlug = exports.getCollections = exports.deleteCategory = exports.updateCategory = exports.createCategory = exports.getCategories = exports.deleteProduct = exports.updateProduct = exports.createProduct = exports.getProductBySlug = exports.getProducts = void 0;
+exports.deleteFlavour = exports.updateFlavour = exports.createFlavour = exports.getFlavours = exports.createType = exports.getTypes = exports.createTag = exports.getTags = exports.deleteCollection = exports.updateCollection = exports.createCollection = exports.getCollectionBySlug = exports.getCollections = exports.deleteCategory = exports.updateCategory = exports.createCategory = exports.getCategories = exports.deleteProduct = exports.updateProduct = exports.createProduct = exports.getProductBySlug = exports.getProducts = void 0;
 const prisma_1 = require("../../common/lib/prisma");
 const product_service_1 = require("./product.service");
 const getProducts = async (req, res) => {
     try {
-        const { category, search, sort, page = "1", limit = "10", featured } = req.query;
-        const pageNum = parseInt(page);
-        const limitNum = parseInt(limit);
+        const { category, flavour, search, sort, page = "1", limit = "10", featured } = req.query;
+        const pageNum = Math.max(1, parseInt(page) || 1);
+        const limitNum = Math.min(Math.max(1, parseInt(limit) || 10), 100); // Cap at 100
         const skip = (pageNum - 1) * limitNum;
         const where = {};
-        if (featured === "true")
-            where.featured = true;
+        if (featured === "true") {
+            where.OR = [
+                { featured: true },
+                { tags: { some: { name: "featured" } } }
+            ];
+        }
         if (category)
             where.category = { slug: category };
-        if (search)
-            where.OR = [
+        if (flavour)
+            where.flavours = { some: { slug: flavour } };
+        if (search) {
+            const searchFilter = [
                 { name: { contains: search, mode: "insensitive" } },
                 { description: { contains: search, mode: "insensitive" } }
             ];
+            if (where.OR) {
+                // If we already have a featured OR, we need to AND it with the search OR
+                where.AND = [
+                    { OR: where.OR },
+                    { OR: searchFilter }
+                ];
+                delete where.OR;
+            }
+            else {
+                where.OR = searchFilter;
+            }
+        }
         const [products, total] = await Promise.all([
             prisma_1.prisma.product.findMany({
                 where,
@@ -28,6 +46,7 @@ const getProducts = async (req, res) => {
                     category: true,
                     type: true,
                     tags: true,
+                    flavours: true,
                     variants: true,
                     images: {
                         orderBy: { order: "asc" },
@@ -55,7 +74,7 @@ const getProducts = async (req, res) => {
     }
     catch (error) {
         console.error("Fetch products error:", error);
-        res.status(500).json({ message: "Failed to fetch products", error });
+        res.status(500).json({ message: "Failed to fetch products" });
     }
 };
 exports.getProducts = getProducts;
@@ -71,6 +90,7 @@ const getProductBySlug = async (req, res) => {
                     orderBy: { order: "asc" },
                     select: { id: true, isThumbnail: true, order: true, mimeType: true }
                 },
+                flavours: true,
                 reviews: { include: { user: { select: { name: true } } } }
             }
         });
@@ -93,14 +113,37 @@ const getProductBySlug = async (req, res) => {
 exports.getProductBySlug = getProductBySlug;
 const createProduct = async (req, res) => {
     try {
-        const { name, subtitle, slug, sku, description, price, stock, categoryId, typeId, tags, collections, status, discountable, weight, length, height, width, originCountry, material, hsCode, midCode, metaTitle, metaDescription, keywords, canonicalUrl, ogImage, changefreq, options, metadata, variants, featured } = req.body;
+        const { name, subtitle, slug, sku, description, price, stock, categoryId, typeId, tags, collections, flavours, status, discountable, weight, length, height, width, originCountry, material, hsCode, midCode, metaTitle, metaDescription, keywords, canonicalUrl, ogImage, changefreq, options, metadata, variants, featured } = req.body;
         if (!categoryId) {
             return res.status(400).json({ message: "Category is required" });
         }
         const finalSlug = slug || name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
         let tagsArray = [];
         if (tags) {
-            tagsArray = Array.isArray(tags) ? tags : (typeof tags === "string" ? JSON.parse(tags) : []);
+            try {
+                tagsArray = Array.isArray(tags) ? tags : (typeof tags === "string" ? JSON.parse(tags) : []);
+            }
+            catch (e) {
+                tagsArray = [];
+            }
+        }
+        let collectionsArray = [];
+        if (collections) {
+            try {
+                collectionsArray = Array.isArray(collections) ? collections : (typeof collections === "string" ? JSON.parse(collections) : []);
+            }
+            catch (e) {
+                collectionsArray = [];
+            }
+        }
+        let flavoursArray = [];
+        if (flavours) {
+            try {
+                flavoursArray = Array.isArray(flavours) ? flavours : (typeof flavours === "string" ? JSON.parse(flavours) : []);
+            }
+            catch (e) {
+                flavoursArray = [];
+            }
         }
         const files = req.files || [];
         let processedImages = [];
@@ -116,20 +159,6 @@ const createProduct = async (req, res) => {
                 order: index,
                 isThumbnail: index === 0
             }));
-            // Process ogImage file if present
-            const ogImgFile = files.find(f => f.fieldname === "ogImage" || f.fieldname === "og_image");
-            if (ogImgFile) {
-                const ogImageRecord = await prisma_1.prisma.productImage.create({
-                    data: {
-                        productId: "TEMP_ID", // Will be updated if nested creation fails, but here we handle it differently
-                        data: ogImgFile.buffer,
-                        mimeType: ogImgFile.mimetype,
-                        order: 99,
-                    }
-                });
-                // We'll update the productId later if necessary, or just use the ID
-                // Actually, it's easier to just push it to processedImages and mark it? No, ogImage in Product is a string.
-            }
             const variantImgFiles = files.filter(f => f.fieldname.startsWith("variant_image_"));
             variantImgFiles.forEach(file => {
                 const index = parseInt(file.fieldname.split("_").pop() || "0");
@@ -188,12 +217,17 @@ const createProduct = async (req, res) => {
                 metadata: metadataData,
                 featured: featured === "true" || featured === true,
                 discountable: discountable === "true" || discountable === true,
-                collections: collections && Array.isArray(collections) ? {
-                    connect: collections.map((id) => ({ id }))
+                collections: collectionsArray.length > 0 ? {
+                    connect: collectionsArray.map((id) => ({ id }))
                 } : undefined,
                 tags: tagsArray.length > 0 ? {
                     connect: tagsArray
                         .filter((t) => typeof t === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i.test(t))
+                        .map((id) => ({ id }))
+                } : undefined,
+                flavours: (flavoursArray && Array.isArray(flavoursArray)) ? {
+                    connect: flavoursArray
+                        .filter((f) => typeof f === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i.test(f))
                         .map((id) => ({ id }))
                 } : undefined,
                 images: {
@@ -207,7 +241,7 @@ const createProduct = async (req, res) => {
                         inventoryQuantity: parseInt(v.inventoryQuantity || v.stock || 0),
                         manageInventory: v.manageInventory === "true" || v.manageInventory === true || v.manageInventory === undefined,
                         allowBackorder: v.allowBackorder === "true" || v.allowBackorder === true,
-                        // image: variantImagesMap.get(idx) ? "BINARY_LATER" : (typeof v.image === 'string' ? v.image : null),
+                        image: typeof v.image === 'string' ? v.image : null,
                         options: v.options
                     }))
                 }
@@ -235,14 +269,51 @@ const createProduct = async (req, res) => {
                 data: { ogImage: ogImgRecord.id }
             });
         }
-        console.log(`[ProductInfo] Created product ${product.id} with ${processedImages.length} images.`);
+        // 3. Process and Link Variant Images
+        for (const [idx, imgData] of variantImagesMap.entries()) {
+            const targetVData = variantData[idx];
+            if (!targetVData)
+                continue;
+            // Find the created variant that matches the title and price from input
+            const variant = product.variants.find(v => v.title === targetVData.title &&
+                Math.abs(Number(v.price) - Number(targetVData.price || targetVData.prices?.[0]?.amount || 0)) < 0.01);
+            if (variant) {
+                const newImage = await prisma_1.prisma.productImage.create({
+                    data: {
+                        productId: product.id,
+                        data: imgData.data,
+                        mimeType: imgData.mimeType,
+                        order: 10 + idx,
+                    }
+                });
+                await prisma_1.prisma.productVariant.update({
+                    where: { id: variant.id },
+                    data: { image: newImage.id }
+                });
+            }
+        }
+        // Re-fetch product to get updated variant image links
+        const updatedProduct = await prisma_1.prisma.product.findUnique({
+            where: { id: product.id },
+            include: {
+                images: { select: { id: true, isThumbnail: true, order: true, mimeType: true } },
+                variants: { orderBy: { createdAt: 'asc' } },
+                type: true,
+                tags: true,
+                category: true,
+                collections: true,
+                flavours: true
+            }
+        });
+        if (!updatedProduct)
+            throw new Error("Product re-fetch failed");
         res.status(201).json({
             success: true,
             product: {
-                ...product,
-                price: Number(product.price),
-                variants: product.variants.map((v) => ({ ...v, price: Number(v.price) })),
-                imageUrls: product.images.map((img) => `/api/images/${img.id}`)
+                ...updatedProduct,
+                price: Number(updatedProduct.price),
+                variants: updatedProduct.variants.map((v) => ({ ...v, price: Number(v.price) })),
+                imageUrls: updatedProduct.images.map((img) => `/api/images/${img.id}`)
             }
         });
     }
@@ -259,11 +330,72 @@ exports.createProduct = createProduct;
 const updateProduct = async (req, res) => {
     try {
         const { id } = req.params;
-        const { name, subtitle, slug, sku, description, price, stock, categoryId, typeId, tags, collections, status, discountable, weight, length, height, width, originCountry, material, hsCode, midCode, metaTitle, metaDescription, keywords, canonicalUrl, ogImage, changefreq, options, metadata, variants, featured } = req.body;
-        const tagsArray = tags ? (Array.isArray(tags) ? tags : (typeof tags === "string" ? JSON.parse(tags) : [])) : undefined;
-        const variantData = variants ? (typeof variants === "string" ? JSON.parse(variants) : variants) : undefined;
-        const optionsData = options ? (typeof options === "string" ? JSON.parse(options) : options) : undefined;
-        const metadataData = metadata ? (typeof metadata === "string" ? JSON.parse(metadata) : metadata) : undefined;
+        const { name, subtitle, slug, sku, description, price, stock, categoryId, typeId, tags, collections, flavours, status, discountable, weight, length, height, width, originCountry, material, hsCode, midCode, metaTitle, metaDescription, keywords, canonicalUrl, ogImage, changefreq, options, metadata, variants, featured, imageOrder } = req.body;
+        let tagsArray = undefined;
+        if (tags) {
+            try {
+                tagsArray = Array.isArray(tags) ? tags : (typeof tags === "string" ? JSON.parse(tags) : []);
+            }
+            catch (e) {
+                tagsArray = [];
+            }
+        }
+        let collectionsArray = undefined;
+        if (collections) {
+            try {
+                collectionsArray = Array.isArray(collections) ? collections : (typeof collections === "string" ? JSON.parse(collections) : []);
+            }
+            catch (e) {
+                collectionsArray = [];
+            }
+        }
+        let flavoursArray = undefined;
+        if (flavours) {
+            try {
+                flavoursArray = Array.isArray(flavours) ? flavours : (typeof flavours === "string" ? JSON.parse(flavours) : []);
+            }
+            catch (e) {
+                flavoursArray = [];
+            }
+        }
+        let variantData = undefined;
+        if (variants) {
+            try {
+                variantData = typeof variants === "string" ? JSON.parse(variants) : variants;
+            }
+            catch (e) {
+                variantData = [];
+            }
+        }
+        let optionsData = undefined;
+        if (options) {
+            try {
+                optionsData = typeof options === "string" ? JSON.parse(options) : options;
+            }
+            catch (e) {
+                optionsData = [];
+            }
+        }
+        let metadataData = undefined;
+        if (metadata) {
+            try {
+                metadataData = typeof metadata === "string" ? JSON.parse(metadata) : metadata;
+            }
+            catch (e) {
+                metadataData = [];
+            }
+        }
+        const hasImageOrder = req.body.imageOrder !== undefined;
+        let imageOrderArray = [];
+        if (hasImageOrder) {
+            try {
+                imageOrderArray = typeof imageOrder === "string" ? JSON.parse(imageOrder) : imageOrder;
+            }
+            catch (e) {
+                imageOrderArray = [];
+            }
+        }
+        const variantImagesMap = new Map();
         const files = req.files || [];
         let processedImages = [];
         // 1. Process Multipart Files
@@ -277,6 +409,11 @@ const updateProduct = async (req, res) => {
                 order: index,
                 isThumbnail: index === 0
             }));
+            const variantImgFiles = files.filter(f => f.fieldname.startsWith("variant_image_"));
+            variantImgFiles.forEach(file => {
+                const index = parseInt(file.fieldname.split("_").pop() || "0");
+                variantImagesMap.set(index, { data: file.buffer, mimeType: file.mimetype });
+            });
         }
         // 2. Fallback: Base64 from body
         if (processedImages.length === 0 && (req.body.product_images || req.body.images)) {
@@ -295,6 +432,31 @@ const updateProduct = async (req, res) => {
                     });
                 }
             });
+        }
+        // 2.5 Handle Image Rearrangement & Cleanup (BEFORE update to avoid deleting new images)
+        if (hasImageOrder) {
+            const variantImageIds = (variantData || []).map((v) => v.image).filter(Boolean);
+            // Cleanup removed images
+            await prisma_1.prisma.productImage.deleteMany({
+                where: {
+                    productId: id,
+                    id: { notIn: [...imageOrderArray, ...variantImageIds] },
+                    order: { lt: 900 }
+                }
+            });
+            // Set orders for existing images
+            for (let i = 0; i < imageOrderArray.length; i++) {
+                const imgId = imageOrderArray[i];
+                if (typeof imgId === 'string' && imgId.length > 20) { // Likely a UUID
+                    await prisma_1.prisma.productImage.updateMany({
+                        where: { id: imgId, productId: id },
+                        data: {
+                            order: i,
+                            isThumbnail: i === 0 && !files.some(f => f.fieldname === "thumbnail")
+                        }
+                    });
+                }
+            }
         }
         const product = await prisma_1.prisma.product.update({
             where: { id: id },
@@ -325,18 +487,24 @@ const updateProduct = async (req, res) => {
                 changefreq,
                 options: optionsData,
                 metadata: metadataData,
-                featured: featured === "true" || featured === true || (featured === "false" || featured === false ? false : undefined),
+                featured: featured !== undefined ? (featured === "true" || featured === true) : undefined,
                 discountable: discountable === "true" || discountable === true,
-                collections: collections && Array.isArray(collections) ? {
-                    set: collections.map((id) => ({ id }))
+                collections: collectionsArray ? {
+                    set: collectionsArray.map((id) => ({ id }))
                 } : undefined,
                 tags: tagsArray ? {
                     set: tagsArray
                         .filter((t) => typeof t === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i.test(t))
                         .map((id) => ({ id }))
                 } : undefined,
+                flavours: (flavoursArray && Array.isArray(flavoursArray) && flavoursArray.length > 0) ? {
+                    set: flavoursArray
+                        .filter((f) => typeof f === "string" && f.length > 0)
+                        .map((id) => ({ id }))
+                } : (flavoursArray && Array.isArray(flavoursArray) && flavoursArray.length === 0) ? {
+                    set: []
+                } : undefined,
                 images: processedImages.length > 0 ? {
-                    deleteMany: {}, // Optional: clear old images if new ones are uploaded
                     create: processedImages
                 } : undefined,
                 variants: variantData ? {
@@ -348,6 +516,7 @@ const updateProduct = async (req, res) => {
                         inventoryQuantity: parseInt(v.inventoryQuantity || v.stock || 0),
                         manageInventory: v.manageInventory === "true" || v.manageInventory === true || v.manageInventory === undefined,
                         allowBackorder: v.allowBackorder === "true" || v.allowBackorder === true,
+                        image: typeof v.image === 'string' ? v.image : null,
                         options: v.options
                     }))
                 } : undefined
@@ -375,13 +544,51 @@ const updateProduct = async (req, res) => {
                 data: { ogImage: ogImgRecord.id }
             });
         }
+        // 3. Process and Link New Variant Images
+        for (const [idx, imgData] of variantImagesMap.entries()) {
+            const targetVData = variantData[idx];
+            if (!targetVData)
+                continue;
+            // Find the updated variant that matches the title
+            const variant = product.variants.find(v => v.title === targetVData.title);
+            if (variant) {
+                const newImage = await prisma_1.prisma.productImage.create({
+                    data: {
+                        productId: product.id,
+                        data: imgData.data,
+                        mimeType: imgData.mimeType,
+                        order: 20 + idx,
+                    }
+                });
+                await prisma_1.prisma.productVariant.update({
+                    where: { id: variant.id },
+                    data: { image: newImage.id }
+                });
+            }
+        }
+        // Re-fetch product to get updated variant image links
+        const updatedProduct = await prisma_1.prisma.product.findUnique({
+            where: { id: product.id },
+            include: {
+                images: { select: { id: true, isThumbnail: true, order: true, mimeType: true } },
+                variants: { orderBy: { createdAt: 'asc' } },
+                tags: true,
+                category: true,
+                collections: true,
+                type: true,
+                flavours: true
+            }
+        });
+        if (!updatedProduct)
+            throw new Error("Product re-fetch failed");
         res.status(200).json({
             success: true,
+            message: "Product updated successfully v2",
             product: {
-                ...product,
-                price: Number(product.price),
-                variants: product.variants.map((v) => ({ ...v, price: Number(v.price) })),
-                imageUrls: product.images.map((img) => `/api/images/${img.id}`)
+                ...updatedProduct,
+                price: Number(updatedProduct.price),
+                variants: updatedProduct.variants.map((v) => ({ ...v, price: Number(v.price) })),
+                imageUrls: updatedProduct.images.map((img) => `/api/images/${img.id}`)
             }
         });
     }
@@ -398,7 +605,14 @@ const deleteProduct = async (req, res) => {
         res.status(200).json({ success: true, message: "Product deleted" });
     }
     catch (error) {
-        res.status(500).json({ message: "Failed to delete product" });
+        console.error("Delete product error:", error);
+        // Check for Prisma foreign key constraint error (P2003)
+        if (error.code === 'P2003') {
+            return res.status(400).json({
+                message: "Cannot delete product because it is linked to existing orders. Please archive it instead."
+            });
+        }
+        res.status(500).json({ message: "Failed to delete product. It might be linked to other records." });
     }
 };
 exports.deleteProduct = deleteProduct;
@@ -558,3 +772,45 @@ const createType = async (req, res) => {
     }
 };
 exports.createType = createType;
+const getFlavours = async (req, res) => {
+    try {
+        const flavours = await product_service_1.ProductService.getFlavours();
+        res.status(200).json({ success: true, flavours });
+    }
+    catch (error) {
+        res.status(500).json({ message: "Failed to fetch flavours" });
+    }
+};
+exports.getFlavours = getFlavours;
+const createFlavour = async (req, res) => {
+    try {
+        const flavour = await product_service_1.ProductService.createFlavour(req.body);
+        res.status(201).json({ success: true, flavour });
+    }
+    catch (error) {
+        res.status(500).json({ message: "Failed to create flavour" });
+    }
+};
+exports.createFlavour = createFlavour;
+const updateFlavour = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const flavour = await product_service_1.ProductService.updateFlavour(id, req.body);
+        res.status(200).json({ success: true, flavour });
+    }
+    catch (error) {
+        res.status(500).json({ message: "Failed to update flavour" });
+    }
+};
+exports.updateFlavour = updateFlavour;
+const deleteFlavour = async (req, res) => {
+    try {
+        const { id } = req.params;
+        await product_service_1.ProductService.deleteFlavour(id);
+        res.status(200).json({ success: true, message: "Flavour deleted" });
+    }
+    catch (error) {
+        res.status(500).json({ message: "Failed to delete flavour" });
+    }
+};
+exports.deleteFlavour = deleteFlavour;

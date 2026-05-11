@@ -74,7 +74,7 @@ const AddressSchema = zod_1.z.union([
     }),
 ]);
 exports.CreateOrderSchema = zod_1.z.object({
-    email: zod_1.z.email("Valid email is required for guest orders").optional(),
+    email: zod_1.z.string().email("Valid email is required for guest orders").optional(),
     items: zod_1.z
         .array(zod_1.z.object({
         productId: zod_1.z.string().uuid("Invalid product ID"),
@@ -85,6 +85,8 @@ exports.CreateOrderSchema = zod_1.z.object({
     billingAddress: AddressSchema.optional(),
     paymentMethod: zod_1.z.string().min(1, "Payment method is required").optional(),
     couponCode: zod_1.z.string().max(50, "Coupon code too long").optional(),
+    password: zod_1.z.string().min(6, "Password must be at least 6 characters").optional(),
+    name: zod_1.z.string().max(100).optional(),
 });
 exports.UpdateOrderStatusSchema = zod_1.z.object({
     status: zod_1.z.enum(["PENDING", "CONFIRMED", "PREPARING", "SHIPPED", "DELIVERED", "CANCELLED"]),
@@ -137,7 +139,7 @@ exports.CreateProductSchema = zod_1.z.object({
         .optional()
         .default(0),
     categoryId: zod_1.z.string().uuid("Invalid category ID"),
-    status: zod_1.z.enum(["DRAFT", "PUBLISHED"]).default("DRAFT"),
+    status: zod_1.z.enum(["DRAFT", "PUBLISHED", "ARCHIVED"]).default("DRAFT"),
     discountable: zod_1.z
         .union([zod_1.z.boolean(), zod_1.z.string()])
         .transform((val) => val === true || val === "true")

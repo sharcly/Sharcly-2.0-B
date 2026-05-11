@@ -7,7 +7,7 @@ exports.PaymentService = exports.stripe = void 0;
 const stripe_1 = __importDefault(require("stripe"));
 const prisma_1 = require("../../common/lib/prisma");
 exports.stripe = new stripe_1.default(process.env.STRIPE_SECRET_KEY, {
-    apiVersion: "2025-01-27-acacia",
+    apiVersion: "2023-10-16",
 });
 class PaymentService {
     static async getOrCreateCustomer(userId) {
@@ -61,6 +61,38 @@ class PaymentService {
             currency,
             metadata,
         });
+    }
+    static async refundOrder(orderId) {
+        try {
+            // Search for payment intent associated with this order
+            const paymentIntents = await exports.stripe.paymentIntents.search({
+                query: `metadata['orderId']:'${orderId}'`,
+            });
+            if (paymentIntents.data.length === 0) {
+                console.warn(`[STRIPE] No payment intent found for order ${orderId}. Skipping refund.`);
+                return;
+            }
+            const pi = paymentIntents.data[0];
+            // Only refund if payment succeeded
+            if (pi.status !== "succeeded") {
+                console.warn(`[STRIPE] Payment intent for order ${orderId} is in status ${pi.status}. Skipping refund.`);
+                return;
+            }
+            // Check if already refunded (optional, Stripe will error if already refunded usually)
+            const refund = await exports.stripe.refunds.create({
+                payment_intent: pi.id,
+                reason: "requested_by_customer",
+                metadata: { orderId }
+            });
+            console.log(`[STRIPE] Refund initiated for order ${orderId}: ${refund.id}`);
+            return refund;
+        }
+        catch (error) {
+            console.error(`[STRIPE] Refund failed for order ${orderId}:`, error.message);
+            // We don't necessarily want to crash the whole cancellation if refund fails, 
+            // but we should log it prominently.
+            throw new Error(`Stripe Refund Failed: ${error.message}`);
+        }
     }
 }
 exports.PaymentService = PaymentService;
