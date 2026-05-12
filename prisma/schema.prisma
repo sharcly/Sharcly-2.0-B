@@ -129,7 +129,7 @@ model Product {
   weight          Float?
   width           Float?
   featured        Boolean          @default(false)
-  tags            ProductTag[]     @relation("ProductToTag")
+  ProductToTag    ProductToTag[]
   orderItems      OrderItem[]
   images          ProductImage[]
   variants        ProductVariant[]
@@ -137,8 +137,8 @@ model Product {
   type            ProductType?     @relation(fields: [typeId], references: [id])
   reviews         Review[]
   collections     Collection[]     @relation("ProductCollections")
-  wishlistedBy    User[]           @relation("UserWishlist")
   flavours        Flavour[]        @relation("ProductFlavours")
+  wishlistedBy    User[]           @relation("UserWishlist")
 
   @@map("products")
 }
@@ -382,7 +382,7 @@ model ProductTag {
   id           String         @id @default(uuid())
   name         String         @unique
   createdAt    DateTime       @default(now())
-  products     Product[]      @relation("ProductToTag")
+  ProductToTag ProductToTag[]
 
   @@map("product_tags")
 }
@@ -564,7 +564,6 @@ model Faq {
   @@map("faqs")
 }
 
-
 model Flavour {
   id        String    @id @default(uuid())
   name      String    @unique
@@ -574,6 +573,17 @@ model Flavour {
   products  Product[] @relation("ProductFlavours")
 
   @@map("flavours")
+}
+
+model ProductToTag {
+  A            String
+  B            String
+  products     Product    @relation(fields: [A], references: [id], onDelete: Cascade)
+  product_tags ProductTag @relation(fields: [B], references: [id], onDelete: Cascade)
+
+  @@id([A, B], map: "_ProductToTag_AB_pkey")
+  @@index([B], map: "_ProductToTag_B_index")
+  @@map("_ProductToTag")
 }
 
 enum DiscountType {
