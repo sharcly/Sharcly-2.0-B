@@ -137,8 +137,8 @@ model Product {
   type            ProductType?     @relation(fields: [typeId], references: [id])
   reviews         Review[]
   collections     Collection[]     @relation("ProductCollections")
-  wishlistedBy    User[]           @relation("UserWishlist")
   flavours        Flavour[]        @relation("ProductFlavours")
+  wishlistedBy    User[]           @relation("UserWishlist")
 
   @@map("products")
 }
@@ -564,7 +564,6 @@ model Faq {
   @@map("faqs")
 }
 
-
 model Flavour {
   id        String    @id @default(uuid())
   name      String    @unique
@@ -575,6 +574,8 @@ model Flavour {
 
   @@map("flavours")
 }
+
+
 
 enum DiscountType {
   PERCENTAGE
