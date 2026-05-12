@@ -184,6 +184,15 @@ export const CreateProductSchema = z.object({
   canonicalUrl: z.string().optional().nullable(),
   ogImage: z.string().optional().nullable(),
   changefreq: z.string().optional().nullable(),
+  featured: z
+    .union([z.boolean(), z.string()])
+    .transform((val) => val === true || val === "true")
+    .optional(),
+  flavours: z.union([z.string(), z.array(z.string())]).optional(),
+  imageOrder: z.union([z.string(), z.array(z.string())]).optional(),
+  faqs: z.union([z.string(), z.array(z.any())]).optional(),
+  contentSections: z.union([z.string(), z.array(z.any())]).optional(),
+  statement: z.union([z.string(), z.any()]).optional(),
 });
 
 export const UpdateProductSchema = CreateProductSchema.partial();

@@ -402,7 +402,9 @@ export const updateProduct = async (req: Request, res: Response) => {
     if (hasImageOrder) {
       try {
         imageOrderArray = typeof imageOrder === "string" ? JSON.parse(imageOrder) : imageOrder;
-      } catch (e) { imageOrderArray = []; }
+      } catch (e) { 
+        imageOrderArray = []; 
+      }
     }
 
     const variantImagesMap = new Map();
