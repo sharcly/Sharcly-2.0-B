@@ -165,6 +165,15 @@ exports.CreateProductSchema = zod_1.z.object({
     canonicalUrl: zod_1.z.string().optional().nullable(),
     ogImage: zod_1.z.string().optional().nullable(),
     changefreq: zod_1.z.string().optional().nullable(),
+    featured: zod_1.z
+        .union([zod_1.z.boolean(), zod_1.z.string()])
+        .transform((val) => val === true || val === "true")
+        .optional(),
+    flavours: zod_1.z.union([zod_1.z.string(), zod_1.z.array(zod_1.z.string())]).optional(),
+    imageOrder: zod_1.z.union([zod_1.z.string(), zod_1.z.array(zod_1.z.string())]).optional(),
+    faqs: zod_1.z.union([zod_1.z.string(), zod_1.z.array(zod_1.z.any())]).optional(),
+    contentSections: zod_1.z.union([zod_1.z.string(), zod_1.z.array(zod_1.z.any())]).optional(),
+    statement: zod_1.z.union([zod_1.z.string(), zod_1.z.any()]).optional(),
 });
 exports.UpdateProductSchema = exports.CreateProductSchema.partial();
 // ─────────────────────────────────────────────────────

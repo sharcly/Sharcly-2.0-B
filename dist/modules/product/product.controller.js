@@ -150,24 +150,15 @@ const createProduct = async (req, res) => {
         const variantImagesMap = new Map();
         // 1. Process Multipart Files (Binary)
         if (files && files.length > 0) {
-            const thumbnailFile = files.find(f => f.fieldname === "thumbnail");
-            const otherImgFiles = files.filter(f => (f.fieldname === "product_images" || f.fieldname === "images" || f.fieldname === "thumbnail") && f !== thumbnailFile);
-            if (thumbnailFile) {
-                processedImages.push({
-                    data: thumbnailFile.buffer,
-                    mimeType: thumbnailFile.mimetype,
-                    order: 0,
-                    isThumbnail: true
-                });
-            }
-            otherImgFiles.forEach((file, index) => {
-                processedImages.push({
-                    data: file.buffer,
-                    mimeType: file.mimetype,
-                    order: thumbnailFile ? index + 1 : index,
-                    isThumbnail: !thumbnailFile && index === 0
-                });
-            });
+            const mainImgFiles = files.filter(f => f.fieldname === "product_images" ||
+                f.fieldname === "images" ||
+                f.fieldname === "thumbnail");
+            processedImages = mainImgFiles.map((file, index) => ({
+                data: file.buffer,
+                mimeType: file.mimetype,
+                order: index,
+                isThumbnail: index === 0
+            }));
             const variantImgFiles = files.filter(f => f.fieldname.startsWith("variant_image_"));
             variantImgFiles.forEach(file => {
                 const index = parseInt(file.fieldname.split("_").pop() || "0");
@@ -339,10 +330,6 @@ exports.createProduct = createProduct;
 const updateProduct = async (req, res) => {
     try {
         const { id } = req.params;
-        // Log full payload for debugging
-        console.log(`[UpdateProduct] PATCH Request for ID: ${id}`);
-        console.log(`[UpdateProduct] Body:`, JSON.stringify(req.body, null, 2));
-        console.log(`[UpdateProduct] Files:`, req.files?.map(f => ({ fieldname: f.fieldname, originalname: f.originalname, size: f.size })));
         const { name, subtitle, slug, sku, description, price, stock, categoryId, typeId, tags, collections, flavours, status, discountable, weight, length, height, width, originCountry, material, hsCode, midCode, metaTitle, metaDescription, keywords, canonicalUrl, ogImage, changefreq, options, metadata, variants, featured, imageOrder } = req.body;
         let tagsArray = undefined;
         if (tags) {
@@ -398,57 +385,30 @@ const updateProduct = async (req, res) => {
                 metadataData = [];
             }
         }
-        const isUUID = (val) => typeof val === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
-        let productUuid = id;
-        const isIdUuid = isUUID(id);
-        console.log(`[UpdateProduct] Received id: "${id}" (isUUID: ${isIdUuid})`);
-        if (!isIdUuid) {
-            const p = await prisma_1.prisma.product.findUnique({ where: { slug: id }, select: { id: true } });
-            if (p) {
-                productUuid = p.id;
-                console.log(`[UpdateProduct] Resolved slug "${id}" to UUID "${productUuid}"`);
-            }
-            else {
-                console.warn(`[UpdateProduct] Could not find product with slug "${id}"`);
-            }
-        }
         const hasImageOrder = req.body.imageOrder !== undefined;
         let imageOrderArray = [];
         if (hasImageOrder) {
             try {
-                const parsed = typeof imageOrder === "string" ? JSON.parse(imageOrder) : imageOrder;
-                imageOrderArray = Array.isArray(parsed) ? parsed : [];
+                imageOrderArray = typeof imageOrder === "string" ? JSON.parse(imageOrder) : imageOrder;
             }
             catch (e) {
-                console.error("Failed to parse imageOrder:", e.message);
                 imageOrderArray = [];
             }
         }
-        // Sanitize image IDs to prevent Prisma crashes on invalid UUIDs
-        const validImageOrder = imageOrderArray.filter(isUUID);
         const variantImagesMap = new Map();
         const files = req.files || [];
         let processedImages = [];
         // 1. Process Multipart Files
         if (files && files.length > 0) {
-            const thumbnailFile = files.find(f => f.fieldname === "thumbnail");
-            const otherImgFiles = files.filter(f => (f.fieldname === "product_images" || f.fieldname === "images" || f.fieldname === "thumbnail") && f !== thumbnailFile);
-            if (thumbnailFile) {
-                processedImages.push({
-                    data: thumbnailFile.buffer,
-                    mimeType: thumbnailFile.mimetype,
-                    order: 0, // Temporary, will be adjusted
-                    isThumbnail: true
-                });
-            }
-            otherImgFiles.forEach((file, index) => {
-                processedImages.push({
-                    data: file.buffer,
-                    mimeType: file.mimetype,
-                    order: index, // Temporary, will be adjusted
-                    isThumbnail: false
-                });
-            });
+            const mainImgFiles = files.filter(f => f.fieldname === "product_images" ||
+                f.fieldname === "images" ||
+                f.fieldname === "thumbnail");
+            processedImages = mainImgFiles.map((file, index) => ({
+                data: file.buffer,
+                mimeType: file.mimetype,
+                order: index,
+                isThumbnail: index === 0
+            }));
             const variantImgFiles = files.filter(f => f.fieldname.startsWith("variant_image_"));
             variantImgFiles.forEach(file => {
                 const index = parseInt(file.fieldname.split("_").pop() || "0");
@@ -473,62 +433,33 @@ const updateProduct = async (req, res) => {
                 }
             });
         }
-        // 2.5 Handle Image Rearrangement & Cleanup
+        // 2.5 Handle Image Rearrangement & Cleanup (BEFORE update to avoid deleting new images)
         if (hasImageOrder) {
-            const variantImageIds = (variantData || []).map((v) => v.image).filter(isUUID);
-            const hasNewThumbnail = processedImages.some(img => img.isThumbnail);
-            console.log(`[UpdateProduct] Processing images for product: ${productUuid}`);
-            console.log(`[UpdateProduct] Valid imageOrder:`, validImageOrder);
-            console.log(`[UpdateProduct] Variant imageIds:`, variantImageIds);
-            const existingImages = await prisma_1.prisma.productImage.findMany({
-                where: { productId: productUuid },
-                select: { id: true, order: true }
-            });
-            console.log(`[UpdateProduct] Images in DB for product:`, existingImages.map(img => ({ id: img.id, order: img.order })));
-            console.log(`[UpdateProduct] Protection List (Keep):`, [...validImageOrder, ...variantImageIds]);
-            const imagesToDelete = await prisma_1.prisma.productImage.findMany({
+            const variantImageIds = (variantData || []).map((v) => v.image).filter(Boolean);
+            // Cleanup removed images
+            await prisma_1.prisma.productImage.deleteMany({
                 where: {
-                    productId: productUuid,
-                    id: { notIn: [...validImageOrder, ...variantImageIds] },
+                    productId: id,
+                    id: { notIn: [...imageOrderArray, ...variantImageIds] },
                     order: { lt: 900 }
                 }
             });
-            console.log(`[UpdateProduct] Found ${imagesToDelete.length} images to delete:`, imagesToDelete.map(i => i.id));
-            for (const img of imagesToDelete) {
-                try {
-                    await prisma_1.prisma.productImage.delete({ where: { id: img.id } });
-                    console.log(`[UpdateProduct] Deleted image: ${img.id}`);
-                }
-                catch (e) {
-                    console.error(`[UpdateProduct] Failed to delete image ${img.id}:`, e.message);
-                }
-            }
             // Set orders for existing images
-            for (let i = 0; i < validImageOrder.length; i++) {
-                const imgId = validImageOrder[i];
-                await prisma_1.prisma.productImage.updateMany({
-                    where: { id: imgId, productId: productUuid },
-                    data: {
-                        order: i + (hasNewThumbnail ? 1 : 0),
-                        isThumbnail: i === 0 && !hasNewThumbnail
-                    }
-                });
-            }
-            // Finalize orders for NEW images
-            const offset = imageOrderArray.length + (hasNewThumbnail ? 1 : 0);
-            processedImages.forEach(img => {
-                if (!img.isThumbnail) {
-                    img.order = img.order + offset;
+            for (let i = 0; i < imageOrderArray.length; i++) {
+                const imgId = imageOrderArray[i];
+                if (typeof imgId === 'string' && imgId.length > 20) { // Likely a UUID
+                    await prisma_1.prisma.productImage.updateMany({
+                        where: { id: imgId, productId: id },
+                        data: {
+                            order: i,
+                            isThumbnail: i === 0 && !files.some(f => f.fieldname === "thumbnail")
+                        }
+                    });
                 }
-                // Thumbnail is already order 0
-            });
-        }
-        // Fallback if no hasImageOrder but we have new images
-        else if (processedImages.length > 0) {
-            // Just keep the order as assigned (0, 1, 2...)
+            }
         }
         const product = await prisma_1.prisma.product.update({
-            where: { id: productUuid },
+            where: { id: id },
             data: {
                 name,
                 subtitle,
@@ -639,7 +570,7 @@ const updateProduct = async (req, res) => {
         const updatedProduct = await prisma_1.prisma.product.findUnique({
             where: { id: product.id },
             include: {
-                images: { select: { id: true, productId: true, isThumbnail: true, order: true, mimeType: true } },
+                images: { select: { id: true, isThumbnail: true, order: true, mimeType: true } },
                 variants: { orderBy: { createdAt: 'asc' } },
                 tags: true,
                 category: true,
