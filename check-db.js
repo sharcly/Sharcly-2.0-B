@@ -1,20 +1,18 @@
-// Use the existing configured prisma instance
-const { prisma } = require('./src/common/lib/prisma');
+const { prisma } = require("./src/common/lib/prisma");
 
-async function check() {
+async function checkColumns() {
   try {
-    const user = await prisma.user.findFirst();
-    console.log("User columns:", Object.keys(user || {}));
-    if (user && 'cart' in user) {
-      console.log("✅ 'cart' field exists in DB!");
-    } else {
-      console.log("❌ 'cart' field MISSING in DB!");
-    }
+    const columns = await prisma.$queryRaw`
+      SELECT column_name, data_type 
+      FROM information_schema.columns 
+      WHERE table_name = 'products'
+    `;
+    console.log("Columns in 'products' table:", columns);
   } catch (err) {
-    console.error("❌ DB Check failed:", err.message);
+    console.error("Error checking columns:", err);
   } finally {
     await prisma.$disconnect();
   }
 }
 
-check();
+checkColumns();
