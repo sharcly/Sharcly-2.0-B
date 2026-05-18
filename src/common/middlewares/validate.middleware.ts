@@ -151,6 +151,12 @@ export const CreateProductSchema = z.object({
     .transform((val) => parseFloat(String(val)))
     .refine((val) => !isNaN(val) && val >= 0, "Price must be a valid positive number")
     .refine((val) => val <= 1000000, "Price too large"),
+  actualPrice: z
+    .union([z.string(), z.number()])
+    .transform((val) => (val === "" || val === "null" || val === null) ? null : parseFloat(String(val)))
+    .refine((val) => val === null || (!isNaN(val) && val >= 0), "Actual price must be a valid positive number")
+    .optional()
+    .nullable(),
   stock: z
     .union([z.string(), z.number()])
     .transform((val) => parseInt(String(val)))
@@ -193,6 +199,8 @@ export const CreateProductSchema = z.object({
   faqs: z.union([z.string(), z.array(z.any())]).optional(),
   contentSections: z.union([z.string(), z.array(z.any())]).optional(),
   statement: z.union([z.string(), z.any()]).optional(),
+  ingredients: z.string().optional().nullable(),
+  testimonials: z.union([z.string(), z.array(z.any())]).optional().nullable(),
 });
 
 export const UpdateProductSchema = CreateProductSchema.partial();

@@ -60,8 +60,15 @@ export const getProducts = async (req: Request, res: Response) => {
     res.status(200).json({
       products: products.map((p: any) => ({
         ...p,
+        ingredients: p.ingredients,
+        testimonials: p.testimonials,
         price: Number(p.price),
-        variants: p.variants.map((v: any) => ({ ...v, price: Number(v.price) })),
+        actualPrice: p.actualPrice ? Number(p.actualPrice) : (p.variants?.find((v: any) => v.actualPrice != null)?.actualPrice ? Number(p.variants.find((v: any) => v.actualPrice != null).actualPrice) : null),
+        variants: p.variants.map((v: any) => ({ 
+          ...v, 
+          price: Number(v.price),
+          actualPrice: v.actualPrice ? Number(v.actualPrice) : null
+        })),
         // Map images to internal API URLs
         imageUrls: p.images.map((img: any) => `/api/images/${img.id}`)
       })),
@@ -100,8 +107,15 @@ export const getProductBySlug = async (req: Request, res: Response) => {
       success: true,
       product: {
         ...product,
+        ingredients: product.ingredients,
+        testimonials: product.testimonials,
         price: Number(product.price),
-        variants: product.variants.map((v: any) => ({ ...v, price: Number(v.price) })),
+        actualPrice: product.actualPrice ? Number(product.actualPrice) : (product.variants?.find((v: any) => v.actualPrice != null)?.actualPrice ? Number(product.variants.find((v: any) => v.actualPrice != null).actualPrice) : null),
+        variants: product.variants.map((v: any) => ({ 
+          ...v, 
+          price: Number(v.price),
+          actualPrice: v.actualPrice ? Number(v.actualPrice) : null
+        })),
         imageUrls: product.images.map((img: any) => `/api/images/${img.id}`)
       }
     });
@@ -113,10 +127,10 @@ export const getProductBySlug = async (req: Request, res: Response) => {
 export const createProduct = async (req: Request, res: Response) => {
   try {
     const {
-      name, subtitle, slug, sku, description, price, stock, categoryId, typeId, tags, collections, flavours,
+      name, subtitle, slug, sku, description, price, actualPrice, stock, categoryId, typeId, tags, collections, flavours,
       status, discountable, weight, length, height, width, originCountry, material, hsCode, midCode,
       metaTitle, metaDescription, keywords, canonicalUrl, ogImage, changefreq,
-      options, metadata, variants, featured
+      options, metadata, variants, featured, ingredients, testimonials
     } = req.body;
 
     if (!categoryId) {
@@ -196,6 +210,7 @@ export const createProduct = async (req: Request, res: Response) => {
     const optionsData = options ? (typeof options === "string" ? JSON.parse(options) : options) : null;
     const metadataData = metadata ? (typeof metadata === "string" ? JSON.parse(metadata) : metadata) : null;
     const keywordsData = keywords ? (Array.isArray(keywords) ? keywords : (typeof keywords === "string" && (keywords.startsWith("[") || keywords.startsWith("{")) ? JSON.parse(keywords) : keywords)) : "";
+    const testimonialsData = testimonials ? (typeof testimonials === "string" ? JSON.parse(testimonials) : testimonials) : null;
 
     const product = await prisma.product.create({
       data: {
@@ -206,6 +221,7 @@ export const createProduct = async (req: Request, res: Response) => {
         description,
         status: status || "DRAFT",
         price: (price !== undefined && price !== "" && price !== "null") ? parseFloat(price as string) : 0,
+        actualPrice: (actualPrice !== undefined && actualPrice !== "" && actualPrice !== "null") ? parseFloat(actualPrice as string) : null,
         stock: (stock !== undefined && stock !== "" && stock !== "null") ? parseInt(stock as string) : 0,
         categoryId: categoryId as string,
         typeId: (typeId && typeId !== "") ? (typeId as string) : null,
@@ -226,6 +242,8 @@ export const createProduct = async (req: Request, res: Response) => {
         options: optionsData,
         metadata: metadataData,
         featured: featured === "true" || featured === true,
+        ingredients: ingredients || null,
+        testimonials: testimonialsData,
         discountable: discountable === "true" || discountable === true,
         collections: collectionsArray.length > 0 ? {
           connect: collectionsArray.map((id: string) => ({ id }))
@@ -248,6 +266,7 @@ export const createProduct = async (req: Request, res: Response) => {
             title: v.title,
             sku: v.sku || null,
             price: parseFloat(v.price || v.prices?.[0]?.amount || v.price || 0),
+            actualPrice: v.actualPrice ? parseFloat(v.actualPrice as string) : null,
             inventoryQuantity: parseInt(v.inventoryQuantity || v.stock || 0),
             manageInventory: v.manageInventory === "true" || v.manageInventory === true || v.manageInventory === undefined,
             allowBackorder: v.allowBackorder === "true" || v.allowBackorder === true,
@@ -330,8 +349,15 @@ export const createProduct = async (req: Request, res: Response) => {
       success: true, 
       product: {
         ...updatedProduct,
+        ingredients: updatedProduct.ingredients,
+        testimonials: updatedProduct.testimonials,
         price: Number(updatedProduct.price),
-        variants: updatedProduct.variants.map((v: any) => ({ ...v, price: Number(v.price) })),
+        actualPrice: updatedProduct.actualPrice ? Number(updatedProduct.actualPrice) : (updatedProduct.variants?.find((v: any) => v.actualPrice != null)?.actualPrice ? Number(updatedProduct.variants.find((v: any) => v.actualPrice != null).actualPrice) : null),
+        variants: updatedProduct.variants.map((v: any) => ({ 
+          ...v, 
+          price: Number(v.price),
+          actualPrice: v.actualPrice ? Number(v.actualPrice) : null
+        })),
         imageUrls: updatedProduct.images.map((img: any) => `/api/images/${img.id}`)
       }
     });
@@ -349,10 +375,10 @@ export const updateProduct = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const {
-      name, subtitle, slug, sku, description, price, stock, categoryId, typeId, tags, collections, flavours,
+      name, subtitle, slug, sku, description, price, actualPrice, stock, categoryId, typeId, tags, collections, flavours,
       status, discountable, weight, length, height, width, originCountry, material, hsCode, midCode,
       metaTitle, metaDescription, keywords, canonicalUrl, ogImage, changefreq,
-      options, metadata, variants, featured, imageOrder
+      options, metadata, variants, featured, imageOrder, ingredients, testimonials
     } = req.body;
 
     let tagsArray = undefined;
@@ -395,6 +421,13 @@ export const updateProduct = async (req: Request, res: Response) => {
       try {
         metadataData = typeof metadata === "string" ? JSON.parse(metadata) : metadata;
       } catch (e) { metadataData = []; }
+    }
+
+    let testimonialsData = undefined;
+    if (testimonials) {
+      try {
+        testimonialsData = typeof testimonials === "string" ? JSON.parse(testimonials) : testimonials;
+      } catch (e) { testimonialsData = []; }
     }
 
     const hasImageOrder = req.body.imageOrder !== undefined;
@@ -491,6 +524,7 @@ export const updateProduct = async (req: Request, res: Response) => {
         description,
         status,
         price: (price !== undefined && price !== "" && price !== "null") ? parseFloat(price as string) : undefined,
+        actualPrice: (actualPrice !== undefined && actualPrice !== "" && actualPrice !== "null") ? parseFloat(actualPrice as string) : (actualPrice === null ? null : undefined),
         stock: (stock !== undefined && stock !== "" && stock !== "null") ? parseInt(stock as string) : undefined,
         categoryId: categoryId ? (categoryId as string) : undefined,
         typeId: (typeId && typeId !== "") ? (typeId as string) : (typeId === null ? null : undefined),
@@ -511,6 +545,8 @@ export const updateProduct = async (req: Request, res: Response) => {
         options: optionsData,
         metadata: metadataData,
         featured: featured !== undefined ? (featured === "true" || featured === true) : undefined,
+        ingredients: ingredients !== undefined ? (ingredients || null) : undefined,
+        testimonials: testimonialsData !== undefined ? testimonialsData : undefined,
         discountable: discountable === "true" || discountable === true,
         collections: collectionsArray ? {
           set: collectionsArray.map((id: string) => ({ id }))
@@ -536,6 +572,7 @@ export const updateProduct = async (req: Request, res: Response) => {
             title: v.title,
             sku: v.sku || null,
             price: parseFloat(v.price || 0),
+            actualPrice: v.actualPrice ? parseFloat(v.actualPrice as string) : null,
             inventoryQuantity: parseInt(v.inventoryQuantity || v.stock || 0),
             manageInventory: v.manageInventory === "true" || v.manageInventory === true || v.manageInventory === undefined,
             allowBackorder: v.allowBackorder === "true" || v.allowBackorder === true,
@@ -615,8 +652,15 @@ export const updateProduct = async (req: Request, res: Response) => {
       message: "Product updated successfully v2",
       product: {
         ...updatedProduct,
+        ingredients: updatedProduct.ingredients,
+        testimonials: updatedProduct.testimonials,
         price: Number(updatedProduct.price),
-        variants: updatedProduct.variants.map((v: any) => ({ ...v, price: Number(v.price) })),
+        actualPrice: updatedProduct.actualPrice ? Number(updatedProduct.actualPrice) : (updatedProduct.variants?.find((v: any) => v.actualPrice != null)?.actualPrice ? Number(updatedProduct.variants.find((v: any) => v.actualPrice != null).actualPrice) : null),
+        variants: updatedProduct.variants.map((v: any) => ({ 
+          ...v, 
+          price: Number(v.price),
+          actualPrice: v.actualPrice ? Number(v.actualPrice) : null
+        })),
         imageUrls: updatedProduct.images.map((img: any) => `/api/images/${img.id}`)
       }
     });
