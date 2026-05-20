@@ -129,6 +129,9 @@ model Product {
   weight          Float?
   width           Float?
   featured        Boolean          @default(false)
+  actualPrice     Decimal?
+  ingredients     String?
+  testimonials    Json?
   tags            ProductTag[]     @relation("ProductToTag")
   orderItems      OrderItem[]
   images          ProductImage[]
@@ -156,6 +159,7 @@ model ProductVariant {
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
   image             String?
+  actualPrice       Decimal?
   product           Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@map("product_variants")
