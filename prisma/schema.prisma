@@ -579,6 +579,24 @@ model Flavour {
   @@map("flavours")
 }
 
+model PaymentGateway {
+  id             String   @id @default(uuid())
+  name           String
+  provider       String   // e.g., "stripe" | "paypal" | "razorpay"
+  publishableKey String?  // Specific to Stripe, etc.
+  secretKey      String   // Secret API Key or Secret Key
+  webhookSecret  String?  // Webhook validation secret
+  config         Json?    // Generic JSON storage for provider-specific credentials
+  rotationLimit  Int      @default(10) // Max successful payments in a row before rotation
+  paymentCount   Int      @default(0)  // Current transaction count in this cycle
+  totalPayments  Int      @default(0)  // Lifetime payments count
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@map("payment_gateways")
+}
+
 
 
 enum DiscountType {
