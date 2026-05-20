@@ -94,7 +94,7 @@ export class OrderService {
   }
 
   static async createOrder(userId: string | undefined, email: string, orderData: any) {
-    const { shippingAddress, billingAddress, paymentMethod } = orderData;
+    const { shippingAddress, billingAddress, paymentMethod, gatewayId } = orderData;
 
     // 1. Calculate Totals (Backend Source of Truth)
     const totals = await this.calculateOrderTotals(orderData);
@@ -195,7 +195,8 @@ export class OrderService {
         const paymentIntent = await PaymentService.createPaymentIntent(
           totals.totalAmount,
           "usd",
-          { orderId: order.id, userId: finalUserId }
+          { orderId: order.id, userId: finalUserId },
+          gatewayId
         );
         clientSecret = paymentIntent.client_secret || undefined;
       } catch (pErr: any) {
