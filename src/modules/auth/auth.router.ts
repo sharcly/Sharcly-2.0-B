@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { login, register, getProfile, getMe, verifyEmail, refreshTokens, logout, changePassword, sendOtp, forgotPassword, resetPassword, deactivateAccount } from "./auth.controller";
-import { authenticate } from "../../common/middlewares/auth.middleware";
+import { authenticate, optionalAuth } from "../../common/middlewares/auth.middleware";
 import { validate, LoginSchema, RegisterSchema, ChangePasswordSchema, ForgotPasswordSchema, ResetPasswordSchema } from "../../common/middlewares/validate.middleware";
 import rateLimit from "express-rate-limit";
 
@@ -148,7 +148,7 @@ router.post("/refresh-token", refreshTokens);
  *       200:
  *         description: Logged out successfully
  */
-router.post("/logout", authenticate, logout);
+router.post("/logout", optionalAuth, logout);
 
 /**
  * @swagger

@@ -132,6 +132,12 @@ exports.CreateProductSchema = zod_1.z.object({
         .transform((val) => parseFloat(String(val)))
         .refine((val) => !isNaN(val) && val >= 0, "Price must be a valid positive number")
         .refine((val) => val <= 1000000, "Price too large"),
+    actualPrice: zod_1.z
+        .union([zod_1.z.string(), zod_1.z.number()])
+        .transform((val) => (val === "" || val === "null" || val === null) ? null : parseFloat(String(val)))
+        .refine((val) => val === null || (!isNaN(val) && val >= 0), "Actual price must be a valid positive number")
+        .optional()
+        .nullable(),
     stock: zod_1.z
         .union([zod_1.z.string(), zod_1.z.number()])
         .transform((val) => parseInt(String(val)))
@@ -165,6 +171,17 @@ exports.CreateProductSchema = zod_1.z.object({
     canonicalUrl: zod_1.z.string().optional().nullable(),
     ogImage: zod_1.z.string().optional().nullable(),
     changefreq: zod_1.z.string().optional().nullable(),
+    featured: zod_1.z
+        .union([zod_1.z.boolean(), zod_1.z.string()])
+        .transform((val) => val === true || val === "true")
+        .optional(),
+    flavours: zod_1.z.union([zod_1.z.string(), zod_1.z.array(zod_1.z.string())]).optional(),
+    imageOrder: zod_1.z.union([zod_1.z.string(), zod_1.z.array(zod_1.z.string())]).optional(),
+    faqs: zod_1.z.union([zod_1.z.string(), zod_1.z.array(zod_1.z.any())]).optional(),
+    contentSections: zod_1.z.union([zod_1.z.string(), zod_1.z.array(zod_1.z.any())]).optional(),
+    statement: zod_1.z.union([zod_1.z.string(), zod_1.z.any()]).optional(),
+    ingredients: zod_1.z.string().optional().nullable(),
+    testimonials: zod_1.z.union([zod_1.z.string(), zod_1.z.array(zod_1.z.any())]).optional().nullable(),
 });
 exports.UpdateProductSchema = exports.CreateProductSchema.partial();
 // ─────────────────────────────────────────────────────

@@ -120,7 +120,11 @@ const refreshTokens = async (req, res) => {
 exports.refreshTokens = refreshTokens;
 const logout = async (req, res) => {
     try {
-        await auth_service_1.AuthService.logout(req.user.id);
+        if (req.user?.id) {
+            await auth_service_1.AuthService.logout(req.user.id).catch((err) => {
+                console.warn("[Logout] Failed to clear refreshToken in DB:", err.message);
+            });
+        }
         // Clear httpOnly cookies
         const cookieOptions = getCookieOptions(req);
         res.clearCookie("access_token", { ...cookieOptions });
