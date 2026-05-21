@@ -66,5 +66,66 @@ export class CmsService {
 
     return cmsImage.id;
   }
+
+  /**
+   * Upload a video for CMS use (e.g. hero section)
+   * Replaces any existing video with the same purpose
+   */
+  static async uploadVideo(file: Express.Multer.File, purpose: string = "hero") {
+    // Delete any existing video with the same purpose
+    await prisma.cmsVideo.deleteMany({
+      where: { purpose }
+    });
+
+    // Create new CmsVideo record
+    const cmsVideo = await prisma.cmsVideo.create({
+      data: {
+        data: file.buffer,
+        mimeType: file.mimetype,
+        purpose,
+        fileName: file.originalname,
+        fileSize: file.size
+      }
+    });
+
+    return cmsVideo;
+  }
+
+  /**
+   * Get the latest video for a specific purpose
+   */
+  static async getVideoByPurpose(purpose: string) {
+    return await prisma.cmsVideo.findFirst({
+      where: { purpose },
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        mimeType: true,
+        purpose: true,
+        fileName: true,
+        fileSize: true,
+        createdAt: true
+      }
+    });
+  }
+
+  /**
+   * Get video binary data by ID for streaming
+   */
+  static async getVideoData(id: string) {
+    return await prisma.cmsVideo.findUnique({
+      where: { id }
+    });
+  }
+
+  /**
+   * Delete a video by ID
+   */
+  static async deleteVideo(id: string) {
+    return await prisma.cmsVideo.delete({
+      where: { id }
+    });
+  }
 }
+
 
