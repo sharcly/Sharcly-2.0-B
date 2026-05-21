@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.CmsService = void 0;
 const prisma_1 = require("../../common/lib/prisma");
+const image_service_1 = require("../image/image.service");
 class CmsService {
     /**
      * Get all content for a specific page
@@ -50,6 +51,19 @@ class CmsService {
             results.push(res);
         }
         return results;
+    }
+    /**
+     * Upload and optimize an image for CMS use
+     */
+    static async uploadImage(file) {
+        const optimizedData = await (0, image_service_1.optimizeImage)(file.buffer);
+        const cmsImage = await prisma_1.prisma.cmsImage.create({
+            data: {
+                data: optimizedData,
+                mimeType: "image/webp"
+            }
+        });
+        return cmsImage.id;
     }
 }
 exports.CmsService = CmsService;

@@ -1,4 +1,5 @@
 import { prisma } from "../../common/lib/prisma";
+import { optimizeImage } from "../image/image.service";
 
 export class CmsService {
   /**
@@ -48,4 +49,22 @@ export class CmsService {
     }
     return results;
   }
+
+  /**
+   * Upload and optimize an image for CMS use
+   */
+  static async uploadImage(file: Express.Multer.File) {
+    const optimizedData = await optimizeImage(file.buffer);
+    
+    // Create new CmsImage record
+    const cmsImage = await prisma.cmsImage.create({
+      data: {
+        data: optimizedData,
+        mimeType: "image/webp"
+      }
+    });
+
+    return cmsImage.id;
+  }
 }
+
