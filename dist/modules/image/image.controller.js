@@ -55,6 +55,20 @@ const getImage = async (req, res) => {
                 }
             }
         }
+        // If still not found in product/blog images, check cms images
+        if (!image || !image.data) {
+            if (isUUID) {
+                const cmsImg = await prisma_1.prisma.cmsImage.findUnique({
+                    where: { id: id }
+                });
+                if (cmsImg) {
+                    image = {
+                        data: cmsImg.data,
+                        mimeType: cmsImg.mimeType
+                    };
+                }
+            }
+        }
         if (!image || !image.data) {
             console.log(`[ImageServer] 404: Image ${id} not found in database`);
             return res.status(404).json({ message: "Image not found" });
