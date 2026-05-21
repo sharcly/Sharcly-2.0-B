@@ -146,7 +146,7 @@ router.post("/refresh-token", auth_controller_1.refreshTokens);
  *       200:
  *         description: Logged out successfully
  */
-router.post("/logout", auth_middleware_1.authenticate, auth_controller_1.logout);
+router.post("/logout", auth_middleware_1.optionalAuth, auth_controller_1.logout);
 /**
  * @swagger
  * /api/auth/verify-email:
