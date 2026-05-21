@@ -88,7 +88,7 @@ class OrderService {
         };
     }
     static async createOrder(userId, email, orderData) {
-        const { shippingAddress, billingAddress, paymentMethod } = orderData;
+        const { shippingAddress, billingAddress, paymentMethod, gatewayId } = orderData;
         // 1. Calculate Totals (Backend Source of Truth)
         const totals = await this.calculateOrderTotals(orderData);
         // 2. Secure user identification
@@ -177,7 +177,7 @@ class OrderService {
         let clientSecret = undefined;
         if (paymentMethod === 'online') {
             try {
-                const paymentIntent = await payment_service_1.PaymentService.createPaymentIntent(totals.totalAmount, "usd", { orderId: order.id, userId: finalUserId });
+                const paymentIntent = await payment_service_1.PaymentService.createPaymentIntent(totals.totalAmount, "usd", { orderId: order.id, userId: finalUserId }, gatewayId);
                 clientSecret = paymentIntent.client_secret || undefined;
             }
             catch (pErr) {

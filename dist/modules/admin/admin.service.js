@@ -207,5 +207,62 @@ class AdminService {
     static async deleteIntegration(id) {
         return await prisma_1.prisma.apiIntegration.delete({ where: { id } });
     }
+    static async getAllPaymentGateways() {
+        return await prisma_1.prisma.paymentGateway.findMany({
+            orderBy: { createdAt: "desc" }
+        });
+    }
+    static async createPaymentGateway(data) {
+        const { name, provider, publishableKey, secretKey, webhookSecret, config, rotationLimit, isActive } = data;
+        return await prisma_1.prisma.paymentGateway.create({
+            data: {
+                name,
+                provider,
+                publishableKey,
+                secretKey,
+                webhookSecret,
+                config: config || {},
+                rotationLimit: rotationLimit ? parseInt(rotationLimit, 10) : 10,
+                isActive: isActive !== undefined ? isActive : true
+            }
+        });
+    }
+    static async updatePaymentGateway(id, data) {
+        const { name, provider, publishableKey, secretKey, webhookSecret, config, rotationLimit, isActive } = data;
+        const updateData = {};
+        if (name !== undefined)
+            updateData.name = name;
+        if (provider !== undefined)
+            updateData.provider = provider;
+        if (publishableKey !== undefined)
+            updateData.publishableKey = publishableKey;
+        if (secretKey !== undefined)
+            updateData.secretKey = secretKey;
+        if (webhookSecret !== undefined)
+            updateData.webhookSecret = webhookSecret;
+        if (config !== undefined)
+            updateData.config = config;
+        if (rotationLimit !== undefined)
+            updateData.rotationLimit = parseInt(rotationLimit, 10);
+        if (isActive !== undefined)
+            updateData.isActive = isActive;
+        return await prisma_1.prisma.paymentGateway.update({
+            where: { id },
+            data: updateData
+        });
+    }
+    static async deletePaymentGateway(id) {
+        return await prisma_1.prisma.paymentGateway.delete({
+            where: { id }
+        });
+    }
+    static async resetPaymentGatewayCounter(id) {
+        return await prisma_1.prisma.paymentGateway.update({
+            where: { id },
+            data: {
+                paymentCount: 0
+            }
+        });
+    }
 }
 exports.AdminService = AdminService;
