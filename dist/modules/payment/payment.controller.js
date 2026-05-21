@@ -1,6 +1,10 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.handleStripeWebhook = exports.deletePaymentMethod = exports.getPaymentMethods = void 0;
+exports.handleStripeWebhook = exports.getActiveStripeKey = exports.deletePaymentMethod = exports.getPaymentMethods = void 0;
+const stripe_1 = __importDefault(require("stripe"));
 const payment_service_1 = require("./payment.service");
 const prisma_1 = require("../../common/lib/prisma");
 const client_1 = require("@prisma/client");
@@ -27,22 +31,59 @@ const deletePaymentMethod = async (req, res) => {
     }
 };
 exports.deletePaymentMethod = deletePaymentMethod;
+const getActiveStripeKey = async (req, res) => {
+    try {
+        const result = await payment_service_1.PaymentService.getActiveGatewayForCheckout();
+        res.status(200).json({ success: true, ...result });
+    }
+    catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+exports.getActiveStripeKey = getActiveStripeKey;
 const handleStripeWebhook = async (req, res) => {
     const sig = req.headers["stripe-signature"];
+    const { gatewayId } = req.query;
     if (!sig) {
         console.error("[STRIPE] Missing stripe-signature header");
         return res.status(400).send("Webhook Error: Missing stripe-signature header");
     }
     let event;
+    let activeStripe = payment_service_1.stripe;
+    let webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+    // Resolve custom gateway configuration if specified
+    if (gatewayId && gatewayId !== "env-fallback") {
+        try {
+            const gateway = await prisma_1.prisma.paymentGateway.findUnique({
+                where: { id: gatewayId, isActive: true }
+            });
+            if (gateway) {
+                activeStripe = new stripe_1.default(gateway.secretKey, { apiVersion: "2023-10-16" });
+                webhookSecret = gateway.webhookSecret || undefined;
+            }
+            else {
+                console.error(`[STRIPE] Active Payment Gateway not found for webhook ID: ${gatewayId}`);
+                return res.status(404).send("Webhook Error: Matching Stripe configuration not found.");
+            }
+        }
+        catch (dbErr) {
+            console.error(`[STRIPE] DB error fetching gateway details: ${dbErr.message}`);
+            return res.status(500).send("Webhook Error: Internal database error");
+        }
+    }
+    if (!webhookSecret) {
+        console.error("[STRIPE] Webhook secret is not configured.");
+        return res.status(400).send("Webhook Error: Webhook signing secret not found.");
+    }
     try {
-        // req.body must be the raw Buffer (set by express.raw middleware in index.ts)
-        event = payment_service_1.stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
+        // req.body must be the raw Buffer
+        event = activeStripe.webhooks.constructEvent(req.body, sig, webhookSecret);
     }
     catch (err) {
         console.error(`[STRIPE] Webhook signature verification failed: ${err.message}`);
         return res.status(400).send(`Webhook Error: ${err.message}`);
     }
-    console.log(`[STRIPE] Event received: ${event.type} (${event.id})`);
+    console.log(`[STRIPE] Event received: ${event.type} (${event.id}) using gateway: ${gatewayId || "env-fallback"}`);
     try {
         switch (event.type) {
             // ─── Payment Intent Events ────────────────────────────────────────────
@@ -50,11 +91,23 @@ const handleStripeWebhook = async (req, res) => {
                 const paymentIntent = event.data.object;
                 const orderId = paymentIntent.metadata?.orderId;
                 if (orderId) {
-                    await prisma_1.prisma.order.update({
-                        where: { id: orderId },
-                        data: { status: client_1.OrderStatus.CONFIRMED },
+                    // Increment transaction counter and confirm the order inside a prisma transaction
+                    await prisma_1.prisma.$transaction(async (tx) => {
+                        await tx.order.update({
+                            where: { id: orderId },
+                            data: { status: client_1.OrderStatus.CONFIRMED },
+                        });
+                        if (gatewayId && gatewayId !== "env-fallback") {
+                            await tx.paymentGateway.update({
+                                where: { id: gatewayId },
+                                data: {
+                                    paymentCount: { increment: 1 },
+                                    totalPayments: { increment: 1 }
+                                }
+                            });
+                        }
                     });
-                    console.log(`[STRIPE] Order ${orderId} marked as CONFIRMED (payment_intent.succeeded)`);
+                    console.log(`[STRIPE] Order ${orderId} confirmed and gateway count incremented (payment_intent.succeeded)`);
                 }
                 break;
             }
@@ -63,7 +116,6 @@ const handleStripeWebhook = async (req, res) => {
                 const orderId = paymentIntent.metadata?.orderId;
                 const errorMessage = paymentIntent.last_payment_error?.message || "Unknown error";
                 console.warn(`[STRIPE] Payment failed for order ${orderId ?? "unknown"}: ${errorMessage}`);
-                // Optionally mark order as FAILED if your schema supports it
                 break;
             }
             case "payment_intent.created": {
@@ -92,7 +144,6 @@ const handleStripeWebhook = async (req, res) => {
                 const charge = event.data.object;
                 const orderId = charge.metadata?.orderId;
                 console.log(`[STRIPE] Charge refunded: ${charge.id} for order ${orderId ?? "unknown"}`);
-                // Optionally update order to REFUNDED status if your schema supports it
                 break;
             }
             case "charge.dispute.created": {
@@ -108,7 +159,6 @@ const handleStripeWebhook = async (req, res) => {
             }
             case "customer.deleted": {
                 const customer = event.data.object;
-                // Clear stripeCustomerId from our database
                 await prisma_1.prisma.user.updateMany({
                     where: { stripeCustomerId: customer.id },
                     data: { stripeCustomerId: null },
@@ -127,14 +177,12 @@ const handleStripeWebhook = async (req, res) => {
                 console.log(`[STRIPE] Payment method detached: ${pm.id}`);
                 break;
             }
-            // ─── Fallback ─────────────────────────────────────────────────────────
             default:
                 console.log(`[STRIPE] Unhandled event type: ${event.type}`);
         }
     }
     catch (handlerError) {
         console.error(`[STRIPE] Error processing event ${event.type}:`, handlerError);
-        // Still return 200 to prevent Stripe from retrying — log and monitor separately
     }
     return res.status(200).json({
         received: true,
