@@ -158,7 +158,7 @@ export class MarketingService {
       KlaviyoService.init(seoSettings?.klaviyoPrivateKey || undefined);
       
       // Add to list
-      await KlaviyoService.subscribeToList(email);
+      await KlaviyoService.subscribeToList(email, seoSettings?.klaviyoPublicKey || undefined);
       
       // Track event
       await KlaviyoService.trackEvent(email, "Subscribed to Newsletter", {

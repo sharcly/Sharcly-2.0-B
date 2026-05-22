@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import { MarketingService } from "./marketing.service";
+import { SeoService } from "../seo/seo.service";
 
 export class MarketingController {
   static async getActiveOffers(req: Request, res: Response) {
@@ -107,6 +108,21 @@ export class MarketingController {
     try {
       const subscribers = await MarketingService.getSubscribers();
       res.json(subscribers);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  }
+  static async getKlaviyoStatus(req: Request, res: Response) {
+    try {
+      const seoSettings = await SeoService.getGlobalSettings();
+      const hasKey = !!seoSettings?.klaviyoPrivateKey;
+      const hasList = !!seoSettings?.klaviyoPublicKey;
+      
+      res.json({
+        active: hasKey && hasList,
+        hasKey,
+        hasList
+      });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

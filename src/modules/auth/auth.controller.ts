@@ -77,6 +77,8 @@ export const login = async (req: Request, res: Response) => {
     res.status(200).json({
       success: true,
       user: result.user,
+      accessToken: result.tokens.accessToken,
+      refreshToken: result.tokens.refreshToken,
     });
   } catch (error: any) {
     res.status(401).json({ message: error.message || "Login failed" });
@@ -112,6 +114,8 @@ export const refreshTokens = async (req: Request, res: Response) => {
 
     res.status(200).json({
       success: true,
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
     });
   } catch (error: any) {
     console.error("[Auth] Refresh token failed:", error.message);

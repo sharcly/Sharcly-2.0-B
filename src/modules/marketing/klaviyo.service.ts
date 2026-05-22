@@ -1,23 +1,31 @@
-import { Klaviyo, Link } from "klaviyo-api";
+import { ConfigWrapper, EventsApi, ProfilesApi } from "klaviyo-api";
 
 export class KlaviyoService {
-  private static client: any;
+  private static session: any = null;
+  private static eventsApi: EventsApi | null = null;
+  private static profilesApi: ProfilesApi | null = null;
 
   static init(apiKey?: string) {
     const key = apiKey || process.env.KLAVIYO_PRIVATE_API_KEY;
     if (key) {
-      this.client = (require('klaviyo-api') as any).Klaviyo(key);
+      try {
+        this.session = ConfigWrapper(key);
+        this.eventsApi = new EventsApi(this.session);
+        this.profilesApi = new ProfilesApi(this.session);
+      } catch (err) {
+        console.error("Klaviyo Initialization Failed:", err);
+      }
     }
   }
 
   /**
-   * Track server-side events (Placed Order, Started Checkout)
+   * Track server-side events (Placed Order, Started Checkout, etc.)
    */
   static async trackEvent(email: string, eventName: string, properties: any) {
-    if (!this.client) return;
+    if (!this.eventsApi) return;
     
     try {
-      await this.client.Events.createEvent({
+      await this.eventsApi.createEvent({
         data: {
           type: "event",
           attributes: {
@@ -33,12 +41,13 @@ export class KlaviyoService {
                 attributes: { email }
               }
             },
-            properties: properties
+            properties: properties,
+            time: new Date()
           }
         }
       });
-    } catch (error) {
-      console.error("Klaviyo Event Track Failed:", error);
+    } catch (error: any) {
+      console.error("Klaviyo Event Track Failed:", error.message || error);
     }
   }
 
@@ -46,10 +55,10 @@ export class KlaviyoService {
    * Add/Update profile in Klaviyo
    */
   static async syncProfile(profileData: { email: string; firstName?: string; lastName?: string; phone?: string }) {
-    if (!this.client) return;
+    if (!this.profilesApi) return;
 
     try {
-      await this.client.Profiles.createOrUpdateProfile({
+      await this.profilesApi.createOrUpdateProfile({
         data: {
           type: "profile",
           attributes: {
@@ -60,8 +69,8 @@ export class KlaviyoService {
           }
         }
       });
-    } catch (error) {
-      console.error("Klaviyo Profile Sync Failed:", error);
+    } catch (error: any) {
+      console.error("Klaviyo Profile Sync Failed:", error.message || error);
     }
   }
 
@@ -69,21 +78,21 @@ export class KlaviyoService {
    * Add member to a specific list
    */
   static async subscribeToList(email: string, listId?: string) {
-    if (!this.client) return;
+    if (!this.profilesApi) return;
 
     // Use a default list if not provided, or fallback to a common "Newsletter" list
     const targetListId = listId || process.env.KLAVIYO_NEWSLETTER_LIST_ID;
-    if (!targetListId) {
-      console.warn("KLAVIYO_NEWSLETTER_LIST_ID not found in .env");
+    if (!targetListId || targetListId === "YOUR_LIST_ID_HERE") {
+      console.warn("Valid Klaviyo Newsletter List ID not found in DB or .env");
       return;
     }
 
     try {
-      await this.client.Profiles.subscribeProfiles({
+      await this.profilesApi.subscribeProfiles({
         data: {
           type: "profile-subscription-bulk-create-job",
           attributes: {
-            custom_source: "Newsletter Footer",
+            customSource: "Newsletter Footer",
             profiles: {
               data: [
                 {
@@ -112,8 +121,8 @@ export class KlaviyoService {
           }
         }
       });
-    } catch (error) {
-      console.error("Klaviyo Subscription Failed:", error);
+    } catch (error: any) {
+      console.error("Klaviyo Subscription Failed:", error.message || error);
     }
   }
 }
