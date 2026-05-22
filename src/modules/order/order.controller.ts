@@ -22,7 +22,8 @@ export const createOrder = async (req: any, res: Response) => {
 
 export const previewOrder = async (req: any, res: Response) => {
   try {
-    const summary = await OrderService.previewOrder(req.body);
+    const email = req.user?.email || req.body.email;
+    const summary = await OrderService.previewOrder(req.body, email);
     res.status(200).json({ success: true, summary });
   } catch (error: any) {
     res.status(400).json({ message: error.message || "Calculation failed" });

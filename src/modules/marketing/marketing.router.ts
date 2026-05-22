@@ -18,5 +18,6 @@ router.put("/offers/:id", authenticate, authorize("admin", "manager"), upload.an
 router.delete("/offers/:id", authenticate, authorize("admin", "manager"), MarketingController.deleteOffer);
 router.get("/claims", authenticate, authorize("admin", "manager"), MarketingController.getClaims);
 router.get("/subscribers", authenticate, authorize("admin", "manager"), MarketingController.getSubscribers);
+router.get("/klaviyo/status", authenticate, authorize("admin", "manager"), MarketingController.getKlaviyoStatus);
 
 export default router;

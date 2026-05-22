@@ -213,7 +213,16 @@ export class OrderService {
       await KlaviyoService.trackEvent(email, "Placed Order", {
         "$value": Number(order.totalAmount),
         "OrderID": order.id,
-        "ItemNames": order.items.map((i: any) => i.productId), // ideally fetch names
+        "ItemNames": totals.items.map((i: any) => i.name),
+        "Items": totals.items.map((i: any) => ({
+             ProductID: i.productId,
+             SKU: i.variantId || i.productId,
+             ProductName: i.name,
+             Quantity: i.quantity,
+             ItemPrice: i.price,
+             RowTotal: i.price * i.quantity,
+             ImageURL: i.image
+        })),
         "ShippingAddress": order.shippingAddress,
         "BillingAddress": order.billingAddress,
       });
@@ -271,8 +280,33 @@ export class OrderService {
     return this.applyLegacyFallback(order, settings);
   }
 
-  static async previewOrder(orderData: any) {
-    return await this.calculateOrderTotals(orderData);
+  static async previewOrder(orderData: any, email?: string) {
+    const summary = await this.calculateOrderTotals(orderData);
+    
+    // Klaviyo Abandoned Cart Tracking ("Started Checkout")
+    if (email) {
+      try {
+        const seoSettings = await SeoService.getGlobalSettings();
+        KlaviyoService.init(seoSettings?.klaviyoPrivateKey || undefined);
+        await KlaviyoService.trackEvent(email, "Started Checkout", {
+          "$value": summary.totalAmount,
+          "ItemNames": summary.items.map((i: any) => i.name),
+          "Items": summary.items.map((i: any) => ({
+             ProductID: i.productId,
+             SKU: i.variantId || i.productId,
+             ProductName: i.name,
+             Quantity: i.quantity,
+             ItemPrice: i.price,
+             RowTotal: i.price * i.quantity,
+             ImageURL: i.image
+          }))
+        });
+      } catch (kErr) {
+        console.warn("Klaviyo Started Checkout Tracking Failed:", kErr);
+      }
+    }
+
+    return summary;
   }
 
   private static applyLegacyFallback(order: any, settings: any) {
