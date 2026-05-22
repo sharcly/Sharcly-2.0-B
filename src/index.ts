@@ -33,6 +33,8 @@ const allowedOrigins = [
   "http://localhost:3000",
   "http://localhost:5173",
   "https://sharcly.io",
+  "https://sharcly.com",
+  "https://www.sharcly.com",
   "https://www.sharcly.io",
   "https://sharcly-2-0.vercel.app",
   process.env.FRONTEND_URL,

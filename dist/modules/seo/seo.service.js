@@ -102,7 +102,7 @@ class SeoService {
         });
     }
     static async generateSitemap() {
-        const baseUrl = process.env.FRONTEND_URL || "https://sharcly.io";
+        const baseUrl = process.env.FRONTEND_URL || "https://sharcly.com";
         const products = await prisma_1.prisma.product.findMany({ select: { slug: true, updatedAt: true } });
         const seoEntries = await prisma_1.prisma.seoMeta.findMany({ select: { pageSlug: true, updatedAt: true } });
         let xml = `<?xml version="1.0" encoding="UTF-8"?>\n`;
@@ -133,7 +133,7 @@ class SeoService {
         const settings = await this.getGlobalSettings();
         if (settings.robotsTxt)
             return settings.robotsTxt;
-        const baseUrl = process.env.FRONTEND_URL || "https://sharcly.io";
+        const baseUrl = process.env.FRONTEND_URL || "https://sharcly.com";
         return `User-agent: *\nAllow: /\n\nSitemap: ${baseUrl}/sitemap.xml`;
     }
 }
