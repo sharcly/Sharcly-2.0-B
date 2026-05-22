@@ -105,7 +105,7 @@ export class SeoService {
     let settings = await prisma.globalSeoSettings.findFirst();
     if (!settings) {
       settings = await prisma.globalSeoSettings.create({
-        data: { 
+        data: {
           siteName: "Sharcly 2.0",
           sitemapUrl: "/sitemap.xml",
           robotsTxt: "User-agent: *\nAllow: /\n\nSitemap: https://sharcly.com/sitemap.xml"
@@ -124,7 +124,7 @@ export class SeoService {
   }
 
   static async generateSitemap() {
-    const baseUrl = process.env.FRONTEND_URL || "https://sharcly.io";
+    const baseUrl = process.env.FRONTEND_URL || "https://sharcly.com";
     const products = await prisma.product.findMany({ select: { slug: true, updatedAt: true } });
     const seoEntries = await prisma.seoMeta.findMany({ select: { pageSlug: true, updatedAt: true } });
 
@@ -160,7 +160,7 @@ export class SeoService {
     const settings = await this.getGlobalSettings();
     if (settings.robotsTxt) return settings.robotsTxt;
 
-    const baseUrl = process.env.FRONTEND_URL || "https://sharcly.io";
+    const baseUrl = process.env.FRONTEND_URL || "https://sharcly.com";
     return `User-agent: *\nAllow: /\n\nSitemap: ${baseUrl}/sitemap.xml`;
   }
 }
