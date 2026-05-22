@@ -146,7 +146,7 @@ router.post("/refresh-token", auth_controller_1.refreshTokens);
  *       200:
  *         description: Logged out successfully
  */
-router.post("/logout", auth_middleware_1.authenticate, auth_controller_1.logout);
+router.post("/logout", auth_middleware_1.optionalAuth, auth_controller_1.logout);
 /**
  * @swagger
  * /api/auth/verify-email:
@@ -193,7 +193,7 @@ router.get("/verify-email", auth_controller_1.verifyEmail);
  */
 router.get("/profile", auth_middleware_1.authenticate, auth_controller_1.getProfile);
 router.get("/me", auth_middleware_1.authenticate, auth_controller_1.getMe);
-router.post("/change-password", auth_middleware_1.authenticate, (0, validate_middleware_1.validate)(validate_middleware_1.ChangePasswordSchema), auth_controller_1.changePassword);
+router.patch("/change-password", auth_middleware_1.authenticate, (0, validate_middleware_1.validate)(validate_middleware_1.ChangePasswordSchema), auth_controller_1.changePassword);
 router.post("/forgot-password", (0, validate_middleware_1.validate)(validate_middleware_1.ForgotPasswordSchema), auth_controller_1.forgotPassword);
 router.post("/reset-password", (0, validate_middleware_1.validate)(validate_middleware_1.ResetPasswordSchema), auth_controller_1.resetPassword);
 router.patch("/deactivate", auth_middleware_1.authenticate, auth_controller_1.deactivateAccount);
