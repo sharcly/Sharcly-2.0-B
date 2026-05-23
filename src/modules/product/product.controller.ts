@@ -1,3 +1,4 @@
+// trigger nodemon restart
 import { Request, Response } from "express";
 import { prisma } from "../../common/lib/prisma";
 import { ProductService } from "./product.service";
@@ -484,19 +485,34 @@ export const updateProduct = async (req: Request, res: Response) => {
     const files = (req.files as any[]) || [];
     let processedImages: any[] = [];
     
-    // 1. Process Multipart Files
+    // Check if a new thumbnail is provided
+    const hasNewThumbnail = files.some(f => f.fieldname === "thumbnail");
+    let existingBaseOrder = hasNewThumbnail ? 1 : 0;
+    
+    // Process Multipart Files
     if (files && files.length > 0) {
       const mainImgFiles = files.filter(f => 
         f.fieldname === "product_images" || 
         f.fieldname === "images" || 
         f.fieldname === "thumbnail"
       );
-      processedImages = mainImgFiles.map((file, index) => ({
-        data: file.buffer,
-        mimeType: file.mimetype,
-        order: index,
-        isThumbnail: index === 0
-      }));
+      
+      let galleryIndex = imageOrderArray.length; // Append after existing images
+      processedImages = mainImgFiles.map((file) => {
+        const isThumb = file.fieldname === "thumbnail";
+        let order = 0;
+        if (isThumb) {
+          order = 0;
+        } else {
+          order = existingBaseOrder + galleryIndex++;
+        }
+        return {
+          data: file.buffer,
+          mimeType: file.mimetype,
+          order: order,
+          isThumbnail: isThumb || (!hasImageOrder && !hasNewThumbnail && order === 0)
+        };
+      });
 
       const variantImgFiles = files.filter(f => f.fieldname.startsWith("variant_image_"));
       variantImgFiles.forEach(file => {
@@ -505,11 +521,12 @@ export const updateProduct = async (req: Request, res: Response) => {
       });
     }
 
-    // 2. Fallback: Base64 from body
+    // Fallback: Base64 from body
     if (processedImages.length === 0 && (req.body.product_images || req.body.images)) {
       const bodyImages = req.body.product_images || req.body.images;
       const imagesToProcess = Array.isArray(bodyImages) ? bodyImages : [bodyImages];
       
+      let galleryIndex = imageOrderArray.length;
       imagesToProcess.forEach((img: any, index: number) => {
         if (typeof img === "string" && img.startsWith("data:image/")) {
           const parts = img.split(";base64,");
@@ -518,14 +535,14 @@ export const updateProduct = async (req: Request, res: Response) => {
           processedImages.push({
             data,
             mimeType,
-            order: index,
-            isThumbnail: index === 0
+            order: existingBaseOrder + galleryIndex++,
+            isThumbnail: !hasImageOrder && !hasNewThumbnail && index === 0
           });
         }
       });
     }
 
-    // 2.5 Handle Image Rearrangement & Cleanup (BEFORE update to avoid deleting new images)
+    // Handle Image Rearrangement & Cleanup (BEFORE update to avoid deleting new images)
     if (hasImageOrder) {
       const variantImageIds = (variantData || []).map((v: any) => v.image).filter(Boolean);
       
@@ -545,8 +562,8 @@ export const updateProduct = async (req: Request, res: Response) => {
            await prisma.productImage.updateMany({
              where: { id: imgId, productId: id as string },
              data: { 
-               order: i,
-               isThumbnail: i === 0 && !files.some(f => f.fieldname === "thumbnail")
+               order: existingBaseOrder + i,
+               isThumbnail: !hasNewThumbnail && i === 0
              }
            });
         }
@@ -705,7 +722,11 @@ export const updateProduct = async (req: Request, res: Response) => {
     });
   } catch (error: any) {
     console.error("Product update error:", error);
-    res.status(500).json({ message: "Failed to update product" });
+    const isProduction = process.env.NODE_ENV === "production";
+    res.status(500).json({ 
+      message: "Failed to update product",
+      ...(isProduction ? {} : { error: String(error), details: error?.meta || error?.code })
+    });
   }
 };
 
