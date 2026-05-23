@@ -96,10 +96,19 @@ export class OrderService {
   static async createOrder(userId: string | undefined, email: string, orderData: any) {
     const { shippingAddress, billingAddress, paymentMethod, gatewayId } = orderData;
 
-    // 1. Calculate Totals (Backend Source of Truth)
+    // 1. Check for Restricted States
+    const settings = await prisma.storeSettings.findFirst();
+    if (settings && settings.restrictedStates && settings.restrictedStates.length > 0) {
+       const userState = orderData.shippingState?.trim();
+       if (userState && settings.restrictedStates.some(state => userState.toLowerCase().includes(state.toLowerCase()))) {
+          throw new Error(`Sorry, we currently do not ship to ${userState} due to local regulations.`);
+       }
+    }
+
+    // 2. Calculate Totals (Backend Source of Truth)
     const totals = await this.calculateOrderTotals(orderData);
 
-    // 2. Secure user identification
+    // 3. Secure user identification
     let finalUserId = userId;
     if (!finalUserId) {
       let guestUser = await prisma.user.findUnique({ where: { email } });
