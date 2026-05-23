@@ -497,32 +497,31 @@ export const updateProduct = async (req: Request, res: Response) => {
     const files = (req.files as any[]) || [];
     let processedImages: any[] = [];
     
-    // Check if a new thumbnail is provided
-    const hasNewThumbnail = files.some(f => f.fieldname === "thumbnail");
-    let existingBaseOrder = hasNewThumbnail ? 1 : 0;
-    
-    // Process Multipart Files
+    const thumbnailFile = files.find(f => f.fieldname === "thumbnail");
+
+    // 1. Process Multipart Files
     if (files && files.length > 0) {
       const galleryFiles = files.filter(f => 
         f.fieldname === "product_images" || 
         f.fieldname === "images"
       );
       
-      let galleryIndex = imageOrderArray.length; // Append after existing images
-      processedImages = mainImgFiles.map((file) => {
-        const isThumb = file.fieldname === "thumbnail";
-        let order = 0;
-        if (isThumb) {
-          order = 0;
-        } else {
-          order = existingBaseOrder + galleryIndex++;
-        }
-        return {
+      if (thumbnailFile) {
+        processedImages.push({
+          data: thumbnailFile.buffer,
+          mimeType: thumbnailFile.mimetype,
+          order: 0,
+          isThumbnail: true
+        });
+      }
+      
+      galleryFiles.forEach((file, index) => {
+        processedImages.push({
           data: file.buffer,
           mimeType: file.mimetype,
-          order: order,
-          isThumbnail: isThumb || (!hasImageOrder && !hasNewThumbnail && order === 0)
-        };
+          order: 1 + index,
+          isThumbnail: false
+        });
       });
 
       const variantImgFiles = files.filter(f => f.fieldname.startsWith("variant_image_"));
@@ -532,12 +531,11 @@ export const updateProduct = async (req: Request, res: Response) => {
       });
     }
 
-    // Fallback: Base64 from body
+    // 2. Fallback: Base64 from body
     if (processedImages.length === 0 && (req.body.product_images || req.body.images)) {
       const bodyImages = req.body.product_images || req.body.images;
       const imagesToProcess = Array.isArray(bodyImages) ? bodyImages : [bodyImages];
       
-      let galleryIndex = imageOrderArray.length;
       imagesToProcess.forEach((img: any, index: number) => {
         if (typeof img === "string" && img.startsWith("data:image/")) {
           const parts = img.split(";base64,");
@@ -546,14 +544,14 @@ export const updateProduct = async (req: Request, res: Response) => {
           processedImages.push({
             data,
             mimeType,
-            order: existingBaseOrder + galleryIndex++,
-            isThumbnail: !hasImageOrder && !hasNewThumbnail && index === 0
+            order: index,
+            isThumbnail: index === 0
           });
         }
       });
     }
 
-    // Handle Image Rearrangement & Cleanup (BEFORE update to avoid deleting new images)
+    // 2.5 Handle Image Rearrangement & Cleanup (BEFORE update to avoid deleting new images)
     if (hasImageOrder) {
       const variantImageIds = (variantData || []).map((v: any) => v.image).filter(Boolean);
       
@@ -573,8 +571,8 @@ export const updateProduct = async (req: Request, res: Response) => {
            await prisma.productImage.updateMany({
              where: { id: imgId, productId: id as string },
              data: { 
-               order: existingBaseOrder + i,
-               isThumbnail: !hasNewThumbnail && i === 0
+               order: thumbnailFile ? i + 1 : i,
+               isThumbnail: !thumbnailFile && i === 0
              }
            });
         }
