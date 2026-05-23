@@ -485,6 +485,8 @@ export const updateProduct = async (req: Request, res: Response) => {
     const files = (req.files as any[]) || [];
     let processedImages: any[] = [];
     
+    const thumbnailFile = files.find(f => f.fieldname === "thumbnail");
+
     // 1. Process Multipart Files
     if (files && files.length > 0) {
       const mainImgFiles = files.filter(f => 
@@ -492,12 +494,24 @@ export const updateProduct = async (req: Request, res: Response) => {
         f.fieldname === "images" || 
         f.fieldname === "thumbnail"
       );
-      processedImages = mainImgFiles.map((file, index) => ({
-        data: file.buffer,
-        mimeType: file.mimetype,
-        order: index,
-        isThumbnail: index === 0
-      }));
+      
+      if (thumbnailFile) {
+        processedImages.push({
+          data: thumbnailFile.buffer,
+          mimeType: thumbnailFile.mimetype,
+          order: 0,
+          isThumbnail: true
+        });
+      }
+      
+      galleryFiles.forEach((file, index) => {
+        processedImages.push({
+          data: file.buffer,
+          mimeType: file.mimetype,
+          order: 1 + index,
+          isThumbnail: false
+        });
+      });
 
       const variantImgFiles = files.filter(f => f.fieldname.startsWith("variant_image_"));
       variantImgFiles.forEach(file => {
@@ -546,8 +560,8 @@ export const updateProduct = async (req: Request, res: Response) => {
            await prisma.productImage.updateMany({
              where: { id: imgId, productId: id as string },
              data: { 
-               order: i,
-               isThumbnail: i === 0 && !files.some(f => f.fieldname === "thumbnail")
+               order: thumbnailFile ? i + 1 : i,
+               isThumbnail: !thumbnailFile && i === 0
              }
            });
         }
