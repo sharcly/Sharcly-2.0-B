@@ -1,3 +1,4 @@
+// trigger nodemon restart
 import { Request, Response } from "express";
 import { prisma } from "../../common/lib/prisma";
 import { ProductService } from "./product.service";
@@ -123,6 +124,45 @@ export const getProductBySlug = async (req: Request, res: Response) => {
     res.status(500).json({ message: "Failed to fetch product" });
   }
 };
+
+export const getRecommendations = async (req: Request, res: Response) => {
+  try {
+    const limit = parseInt(req.query.limit as string) || 3;
+    const excludeIds = req.query.exclude ? (req.query.exclude as string).split(',').filter(Boolean) : [];
+
+    const products = await prisma.product.findMany({
+      where: {
+        ...(excludeIds.length > 0 ? { id: { notIn: excludeIds } } : {})
+      },
+      take: limit,
+      include: {
+        images: {
+          orderBy: { order: "asc" },
+          select: { id: true, isThumbnail: true, order: true, mimeType: true }
+        }
+      },
+      // Optionally sort by featured or createdAt to ensure good recommendations
+      orderBy: [
+        { featured: "desc" },
+        { createdAt: "desc" }
+      ]
+    });
+
+    const formatted = products.map((p: any) => ({
+      id: p.id,
+      name: p.name,
+      slug: p.slug,
+      price: Number(p.price),
+      image: p.images.length > 0 ? `/api/images/${p.images[0].id}` : ""
+    }));
+
+    res.status(200).json({ success: true, recommendations: formatted });
+  } catch (error) {
+    console.error("Fetch recommendations error:", error);
+    res.status(500).json({ message: "Failed to fetch recommendations" });
+  }
+};
+
 
 export const createProduct = async (req: Request, res: Response) => {
   try {
@@ -457,31 +497,32 @@ export const updateProduct = async (req: Request, res: Response) => {
     const files = (req.files as any[]) || [];
     let processedImages: any[] = [];
     
-    const thumbnailFile = files.find(f => f.fieldname === "thumbnail");
-
-    // 1. Process Multipart Files
+    // Check if a new thumbnail is provided
+    const hasNewThumbnail = files.some(f => f.fieldname === "thumbnail");
+    let existingBaseOrder = hasNewThumbnail ? 1 : 0;
+    
+    // Process Multipart Files
     if (files && files.length > 0) {
       const galleryFiles = files.filter(f => 
         f.fieldname === "product_images" || 
         f.fieldname === "images"
       );
       
-      if (thumbnailFile) {
-        processedImages.push({
-          data: thumbnailFile.buffer,
-          mimeType: thumbnailFile.mimetype,
-          order: 0,
-          isThumbnail: true
-        });
-      }
-      
-      galleryFiles.forEach((file, index) => {
-        processedImages.push({
+      let galleryIndex = imageOrderArray.length; // Append after existing images
+      processedImages = mainImgFiles.map((file) => {
+        const isThumb = file.fieldname === "thumbnail";
+        let order = 0;
+        if (isThumb) {
+          order = 0;
+        } else {
+          order = existingBaseOrder + galleryIndex++;
+        }
+        return {
           data: file.buffer,
           mimeType: file.mimetype,
-          order: 1 + index,
-          isThumbnail: false
-        });
+          order: order,
+          isThumbnail: isThumb || (!hasImageOrder && !hasNewThumbnail && order === 0)
+        };
       });
 
       const variantImgFiles = files.filter(f => f.fieldname.startsWith("variant_image_"));
@@ -491,11 +532,12 @@ export const updateProduct = async (req: Request, res: Response) => {
       });
     }
 
-    // 2. Fallback: Base64 from body
+    // Fallback: Base64 from body
     if (processedImages.length === 0 && (req.body.product_images || req.body.images)) {
       const bodyImages = req.body.product_images || req.body.images;
       const imagesToProcess = Array.isArray(bodyImages) ? bodyImages : [bodyImages];
       
+      let galleryIndex = imageOrderArray.length;
       imagesToProcess.forEach((img: any, index: number) => {
         if (typeof img === "string" && img.startsWith("data:image/")) {
           const parts = img.split(";base64,");
@@ -504,14 +546,14 @@ export const updateProduct = async (req: Request, res: Response) => {
           processedImages.push({
             data,
             mimeType,
-            order: index,
-            isThumbnail: index === 0
+            order: existingBaseOrder + galleryIndex++,
+            isThumbnail: !hasImageOrder && !hasNewThumbnail && index === 0
           });
         }
       });
     }
 
-    // 2.5 Handle Image Rearrangement & Cleanup (BEFORE update to avoid deleting new images)
+    // Handle Image Rearrangement & Cleanup (BEFORE update to avoid deleting new images)
     if (hasImageOrder) {
       const variantImageIds = (variantData || []).map((v: any) => v.image).filter(Boolean);
       
@@ -531,8 +573,8 @@ export const updateProduct = async (req: Request, res: Response) => {
            await prisma.productImage.updateMany({
              where: { id: imgId, productId: id as string },
              data: { 
-               order: thumbnailFile ? i + 1 : i,
-               isThumbnail: !thumbnailFile && i === 0
+               order: existingBaseOrder + i,
+               isThumbnail: !hasNewThumbnail && i === 0
              }
            });
         }
@@ -691,7 +733,11 @@ export const updateProduct = async (req: Request, res: Response) => {
     });
   } catch (error: any) {
     console.error("Product update error:", error);
-    res.status(500).json({ message: "Failed to update product" });
+    const isProduction = process.env.NODE_ENV === "production";
+    res.status(500).json({ 
+      message: "Failed to update product",
+      ...(isProduction ? {} : { error: String(error), details: error?.meta || error?.code })
+    });
   }
 };
 
