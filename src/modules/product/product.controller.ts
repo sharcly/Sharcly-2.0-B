@@ -21,19 +21,23 @@ export const getProducts = async (req: Request, res: Response) => {
     if (category) where.category = { slug: category as string };
     if (flavour) where.flavours = { some: { slug: flavour as string } };
     if (search) {
-      const searchFilter = [
-        { name: { contains: search as string, mode: "insensitive" } },
-        { description: { contains: search as string, mode: "insensitive" } }
-      ];
+      const searchTerms = (search as string).trim().split(/\s+/).filter(Boolean);
+      const searchFilter = searchTerms.map(term => ({
+        OR: [
+          { name: { contains: term, mode: "insensitive" } },
+          { description: { contains: term, mode: "insensitive" } }
+        ]
+      }));
+      
       if (where.OR) {
         // If we already have a featured OR, we need to AND it with the search OR
         where.AND = [
           { OR: where.OR },
-          { OR: searchFilter }
+          ...searchFilter
         ];
         delete where.OR;
       } else {
-        where.OR = searchFilter;
+        where.AND = searchFilter;
       }
     }
 
