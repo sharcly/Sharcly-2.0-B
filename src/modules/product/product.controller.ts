@@ -111,7 +111,7 @@ export const getProductBySlug = async (req: Request, res: Response) => {
         ingredients: product.ingredients,
         testimonials: product.testimonials,
         price: Number(product.price),
-        actualPrice: product.actualPrice ? Number(product.actualPrice) : (product.variants?.find((v: any) => v.actualPrice != null)?.actualPrice ? Number(product.variants?.find((v: any) => v.actualPrice != null)?.actualPrice) : null),
+        actualPrice: product.actualPrice ? Number(product.actualPrice) : (product.variants?.find((v: any) => v.actualPrice != null)?.actualPrice ? Number(product.variants.find((v: any) => v.actualPrice != null).actualPrice) : null),
         variants: product.variants.map((v: any) => ({ 
           ...v, 
           price: Number(v.price),
@@ -206,30 +206,18 @@ export const createProduct = async (req: Request, res: Response) => {
 
     // 1. Process Multipart Files (Binary)
     if (files && files.length > 0) {
-      const thumbnailFile = files.find(f => f.fieldname === "thumbnail");
-      const galleryFiles = files.filter(f => 
+      const mainImgFiles = files.filter(f => 
         f.fieldname === "product_images" || 
-        f.fieldname === "images"
+        f.fieldname === "images" || 
+        f.fieldname === "thumbnail"
       );
       
-      let order = 0;
-      if (thumbnailFile) {
-        processedImages.push({
-          data: thumbnailFile.buffer,
-          mimeType: thumbnailFile.mimetype,
-          order: order++,
-          isThumbnail: true
-        });
-      }
-      
-      galleryFiles.forEach((file, index) => {
-        processedImages.push({
-          data: file.buffer,
-          mimeType: file.mimetype,
-          order: order++,
-          isThumbnail: !thumbnailFile && index === 0
-        });
-      });
+      processedImages = mainImgFiles.map((file, index) => ({
+        data: file.buffer,
+        mimeType: file.mimetype,
+        order: index,
+        isThumbnail: index === 0
+      }));
 
       const variantImgFiles = files.filter(f => f.fieldname.startsWith("variant_image_"));
       variantImgFiles.forEach(file => {
@@ -404,7 +392,7 @@ export const createProduct = async (req: Request, res: Response) => {
         ingredients: updatedProduct.ingredients,
         testimonials: updatedProduct.testimonials,
         price: Number(updatedProduct.price),
-        actualPrice: updatedProduct.actualPrice ? Number(updatedProduct.actualPrice) : (updatedProduct.variants?.find((v: any) => v.actualPrice != null)?.actualPrice ? Number(updatedProduct.variants?.find((v: any) => v.actualPrice != null)?.actualPrice) : null),
+        actualPrice: updatedProduct.actualPrice ? Number(updatedProduct.actualPrice) : (updatedProduct.variants?.find((v: any) => v.actualPrice != null)?.actualPrice ? Number(updatedProduct.variants.find((v: any) => v.actualPrice != null).actualPrice) : null),
         variants: updatedProduct.variants.map((v: any) => ({ 
           ...v, 
           price: Number(v.price),
@@ -497,33 +485,19 @@ export const updateProduct = async (req: Request, res: Response) => {
     const files = (req.files as any[]) || [];
     let processedImages: any[] = [];
     
-    // Check if a new thumbnail is provided
-    const hasNewThumbnail = files.some(f => f.fieldname === "thumbnail");
-    let existingBaseOrder = hasNewThumbnail ? 1 : 0;
-    
-    // Process Multipart Files
+    // 1. Process Multipart Files
     if (files && files.length > 0) {
-      const galleryFiles = files.filter(f => 
+      const mainImgFiles = files.filter(f => 
         f.fieldname === "product_images" || 
-        f.fieldname === "images"
+        f.fieldname === "images" || 
+        f.fieldname === "thumbnail"
       );
-      
-      let galleryIndex = imageOrderArray.length; // Append after existing images
-      processedImages = mainImgFiles.map((file) => {
-        const isThumb = file.fieldname === "thumbnail";
-        let order = 0;
-        if (isThumb) {
-          order = 0;
-        } else {
-          order = existingBaseOrder + galleryIndex++;
-        }
-        return {
-          data: file.buffer,
-          mimeType: file.mimetype,
-          order: order,
-          isThumbnail: isThumb || (!hasImageOrder && !hasNewThumbnail && order === 0)
-        };
-      });
+      processedImages = mainImgFiles.map((file, index) => ({
+        data: file.buffer,
+        mimeType: file.mimetype,
+        order: index,
+        isThumbnail: index === 0
+      }));
 
       const variantImgFiles = files.filter(f => f.fieldname.startsWith("variant_image_"));
       variantImgFiles.forEach(file => {
@@ -532,12 +506,11 @@ export const updateProduct = async (req: Request, res: Response) => {
       });
     }
 
-    // Fallback: Base64 from body
+    // 2. Fallback: Base64 from body
     if (processedImages.length === 0 && (req.body.product_images || req.body.images)) {
       const bodyImages = req.body.product_images || req.body.images;
       const imagesToProcess = Array.isArray(bodyImages) ? bodyImages : [bodyImages];
       
-      let galleryIndex = imageOrderArray.length;
       imagesToProcess.forEach((img: any, index: number) => {
         if (typeof img === "string" && img.startsWith("data:image/")) {
           const parts = img.split(";base64,");
@@ -546,14 +519,14 @@ export const updateProduct = async (req: Request, res: Response) => {
           processedImages.push({
             data,
             mimeType,
-            order: existingBaseOrder + galleryIndex++,
-            isThumbnail: !hasImageOrder && !hasNewThumbnail && index === 0
+            order: index,
+            isThumbnail: index === 0
           });
         }
       });
     }
 
-    // Handle Image Rearrangement & Cleanup (BEFORE update to avoid deleting new images)
+    // 2.5 Handle Image Rearrangement & Cleanup (BEFORE update to avoid deleting new images)
     if (hasImageOrder) {
       const variantImageIds = (variantData || []).map((v: any) => v.image).filter(Boolean);
       
@@ -573,8 +546,8 @@ export const updateProduct = async (req: Request, res: Response) => {
            await prisma.productImage.updateMany({
              where: { id: imgId, productId: id as string },
              data: { 
-               order: existingBaseOrder + i,
-               isThumbnail: !hasNewThumbnail && i === 0
+               order: i,
+               isThumbnail: i === 0 && !files.some(f => f.fieldname === "thumbnail")
              }
            });
         }
@@ -722,7 +695,7 @@ export const updateProduct = async (req: Request, res: Response) => {
         ingredients: updatedProduct.ingredients,
         testimonials: updatedProduct.testimonials,
         price: Number(updatedProduct.price),
-        actualPrice: updatedProduct.actualPrice ? Number(updatedProduct.actualPrice) : (updatedProduct.variants?.find((v: any) => v.actualPrice != null)?.actualPrice ? Number(updatedProduct.variants?.find((v: any) => v.actualPrice != null)?.actualPrice) : null),
+        actualPrice: updatedProduct.actualPrice ? Number(updatedProduct.actualPrice) : (updatedProduct.variants?.find((v: any) => v.actualPrice != null)?.actualPrice ? Number(updatedProduct.variants.find((v: any) => v.actualPrice != null).actualPrice) : null),
         variants: updatedProduct.variants.map((v: any) => ({ 
           ...v, 
           price: Number(v.price),
