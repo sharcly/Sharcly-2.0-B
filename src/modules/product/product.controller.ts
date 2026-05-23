@@ -111,7 +111,7 @@ export const getProductBySlug = async (req: Request, res: Response) => {
         ingredients: product.ingredients,
         testimonials: product.testimonials,
         price: Number(product.price),
-        actualPrice: product.actualPrice ? Number(product.actualPrice) : (product.variants?.find((v: any) => v.actualPrice != null)?.actualPrice ? Number(product.variants?.find((v: any) => v.actualPrice != null)?.actualPrice) : null),
+        actualPrice: product.actualPrice ? Number(product.actualPrice) : (product.variants?.find((v: any) => v.actualPrice != null)?.actualPrice ? Number(product.variants.find((v: any) => v.actualPrice != null).actualPrice) : null),
         variants: product.variants.map((v: any) => ({ 
           ...v, 
           price: Number(v.price),
@@ -206,30 +206,18 @@ export const createProduct = async (req: Request, res: Response) => {
 
     // 1. Process Multipart Files (Binary)
     if (files && files.length > 0) {
-      const thumbnailFile = files.find(f => f.fieldname === "thumbnail");
-      const galleryFiles = files.filter(f => 
+      const mainImgFiles = files.filter(f => 
         f.fieldname === "product_images" || 
-        f.fieldname === "images"
+        f.fieldname === "images" || 
+        f.fieldname === "thumbnail"
       );
       
-      let order = 0;
-      if (thumbnailFile) {
-        processedImages.push({
-          data: thumbnailFile.buffer,
-          mimeType: thumbnailFile.mimetype,
-          order: order++,
-          isThumbnail: true
-        });
-      }
-      
-      galleryFiles.forEach((file, index) => {
-        processedImages.push({
-          data: file.buffer,
-          mimeType: file.mimetype,
-          order: order++,
-          isThumbnail: !thumbnailFile && index === 0
-        });
-      });
+      processedImages = mainImgFiles.map((file, index) => ({
+        data: file.buffer,
+        mimeType: file.mimetype,
+        order: index,
+        isThumbnail: index === 0
+      }));
 
       const variantImgFiles = files.filter(f => f.fieldname.startsWith("variant_image_"));
       variantImgFiles.forEach(file => {
@@ -404,7 +392,7 @@ export const createProduct = async (req: Request, res: Response) => {
         ingredients: updatedProduct.ingredients,
         testimonials: updatedProduct.testimonials,
         price: Number(updatedProduct.price),
-        actualPrice: updatedProduct.actualPrice ? Number(updatedProduct.actualPrice) : (updatedProduct.variants?.find((v: any) => v.actualPrice != null)?.actualPrice ? Number(updatedProduct.variants?.find((v: any) => v.actualPrice != null)?.actualPrice) : null),
+        actualPrice: updatedProduct.actualPrice ? Number(updatedProduct.actualPrice) : (updatedProduct.variants?.find((v: any) => v.actualPrice != null)?.actualPrice ? Number(updatedProduct.variants.find((v: any) => v.actualPrice != null).actualPrice) : null),
         variants: updatedProduct.variants.map((v: any) => ({ 
           ...v, 
           price: Number(v.price),
@@ -501,9 +489,10 @@ export const updateProduct = async (req: Request, res: Response) => {
 
     // 1. Process Multipart Files
     if (files && files.length > 0) {
-      const galleryFiles = files.filter(f => 
+      const mainImgFiles = files.filter(f => 
         f.fieldname === "product_images" || 
-        f.fieldname === "images"
+        f.fieldname === "images" || 
+        f.fieldname === "thumbnail"
       );
       
       if (thumbnailFile) {
@@ -720,7 +709,7 @@ export const updateProduct = async (req: Request, res: Response) => {
         ingredients: updatedProduct.ingredients,
         testimonials: updatedProduct.testimonials,
         price: Number(updatedProduct.price),
-        actualPrice: updatedProduct.actualPrice ? Number(updatedProduct.actualPrice) : (updatedProduct.variants?.find((v: any) => v.actualPrice != null)?.actualPrice ? Number(updatedProduct.variants?.find((v: any) => v.actualPrice != null)?.actualPrice) : null),
+        actualPrice: updatedProduct.actualPrice ? Number(updatedProduct.actualPrice) : (updatedProduct.variants?.find((v: any) => v.actualPrice != null)?.actualPrice ? Number(updatedProduct.variants.find((v: any) => v.actualPrice != null).actualPrice) : null),
         variants: updatedProduct.variants.map((v: any) => ({ 
           ...v, 
           price: Number(v.price),
