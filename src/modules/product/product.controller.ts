@@ -124,6 +124,45 @@ export const getProductBySlug = async (req: Request, res: Response) => {
   }
 };
 
+export const getRecommendations = async (req: Request, res: Response) => {
+  try {
+    const limit = parseInt(req.query.limit as string) || 3;
+    const excludeIds = req.query.exclude ? (req.query.exclude as string).split(',').filter(Boolean) : [];
+
+    const products = await prisma.product.findMany({
+      where: {
+        ...(excludeIds.length > 0 ? { id: { notIn: excludeIds } } : {})
+      },
+      take: limit,
+      include: {
+        images: {
+          orderBy: { order: "asc" },
+          select: { id: true, isThumbnail: true, order: true, mimeType: true }
+        }
+      },
+      // Optionally sort by featured or createdAt to ensure good recommendations
+      orderBy: [
+        { featured: "desc" },
+        { createdAt: "desc" }
+      ]
+    });
+
+    const formatted = products.map((p: any) => ({
+      id: p.id,
+      name: p.name,
+      slug: p.slug,
+      price: Number(p.price),
+      image: p.images.length > 0 ? `/api/images/${p.images[0].id}` : ""
+    }));
+
+    res.status(200).json({ success: true, recommendations: formatted });
+  } catch (error) {
+    console.error("Fetch recommendations error:", error);
+    res.status(500).json({ message: "Failed to fetch recommendations" });
+  }
+};
+
+
 export const createProduct = async (req: Request, res: Response) => {
   try {
     const {
