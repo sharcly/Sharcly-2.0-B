@@ -239,6 +239,7 @@ export const StoreSettingsSchema = z.object({
   taxRate: z.number().min(0).max(100).optional(),
   shippingCharge: z.number().min(0).optional(),
   freeShippingThreshold: z.number().min(0).optional(),
+  restrictedStates: z.array(z.string()).optional(),
 });
 
 export const CreateRegionSchema = z.object({
