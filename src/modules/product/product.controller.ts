@@ -752,9 +752,18 @@ export const deleteProduct = async (req: Request, res: Response) => {
     console.error("Delete product error:", error);
     // Check for Prisma foreign key constraint error (P2003)
     if (error.code === 'P2003') {
-      return res.status(400).json({ 
-        message: "Cannot delete product because it is linked to existing orders. Please archive it instead." 
-      });
+      try {
+        await prisma.product.update({
+          where: { id: req.params.id },
+          data: { status: "ARCHIVED" }
+        });
+        return res.status(200).json({ 
+          success: true,
+          message: "Product had existing orders, so it was automatically archived instead of deleted to preserve history." 
+        });
+      } catch (archiveError) {
+        return res.status(500).json({ message: "Failed to archive product." });
+      }
     }
     res.status(500).json({ message: "Failed to delete product. It might be linked to other records." });
   }
