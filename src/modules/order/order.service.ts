@@ -174,9 +174,14 @@ export class OrderService {
                quantity: oi.quantity,
                price: oi.price
             }))
+          },
+          statusHistory: {
+            create: {
+              status: OrderStatus.PENDING
+            }
           }
         },
-        include: { items: true }
+        include: { items: true, statusHistory: true }
       });
 
       // Update stock
@@ -252,7 +257,10 @@ export class OrderService {
   static async getMyOrders(userId: string) {
     const orders = await prisma.order.findMany({
       where: { userId },
-      include: { items: { include: { product: true } } },
+      include: { 
+        items: { include: { product: true } },
+        statusHistory: { orderBy: { createdAt: 'desc' } }
+      },
       orderBy: { createdAt: "desc" }
     });
 
@@ -264,7 +272,8 @@ export class OrderService {
     const orders = await prisma.order.findMany({
       include: { 
         user: { select: { name: true, email: true } }, 
-        items: { include: { product: true } } 
+        items: { include: { product: true } },
+        statusHistory: { orderBy: { createdAt: 'desc' } }
       },
       orderBy: { createdAt: "desc" },
       take: 500 // Limit to prevent timeouts on massive datasets
@@ -280,7 +289,8 @@ export class OrderService {
       include: { 
         user: { select: { name: true, email: true } }, 
         items: { include: { product: true } },
-        coupon: true
+        coupon: true,
+        statusHistory: { orderBy: { createdAt: 'asc' } }
       }
     });
 
@@ -351,10 +361,20 @@ export class OrderService {
   static async updateOrderStatus(id: string, updateData: any) {
     const { status, trackingNumber, carrier, estimatedDelivery, notes } = updateData;
 
+    // Record history
+    if (status) {
+      await prisma.orderStatusHistory.create({
+        data: {
+          orderId: id,
+          status: status as OrderStatus
+        }
+      });
+    }
+
     const updatedOrder = await prisma.order.update({
       where: { id },
       data: { 
-        status: status as OrderStatus,
+        status: status ? (status as OrderStatus) : undefined,
         trackingNumber: trackingNumber || undefined,
         carrier: carrier || undefined,
         estimatedDelivery: estimatedDelivery ? new Date(estimatedDelivery) : undefined,
@@ -362,7 +382,8 @@ export class OrderService {
       },
       include: { 
         user: { select: { email: true, name: true } },
-        items: { include: { product: true } }
+        items: { include: { product: true } },
+        statusHistory: { orderBy: { createdAt: 'asc' } }
       }
     });
 
@@ -390,13 +411,22 @@ export class OrderService {
     }
 
     return await prisma.$transaction(async (tx: any) => {
+      // 0. Record History
+      await tx.orderStatusHistory.create({
+        data: {
+          orderId: id,
+          status: OrderStatus.CANCELLED
+        }
+      });
+
       // 1. Update Order Status
       const updatedOrder = await tx.order.update({
         where: { id },
         data: { 
           status: OrderStatus.CANCELLED,
           cancelReason
-        }
+        },
+        include: { statusHistory: { orderBy: { createdAt: 'asc' } } }
       });
 
       // 2. Restore stock
