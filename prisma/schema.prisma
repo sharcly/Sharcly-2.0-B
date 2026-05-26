@@ -129,6 +129,7 @@ model Product {
   weight          Float?
   width           Float?
   featured        Boolean          @default(false)
+  isComingSoon    Boolean          @default(false)
   actualPrice     Decimal?
   ingredients     String?
   testimonials    Json?
