@@ -130,6 +130,7 @@ model Product {
   width           Float?
   featured        Boolean          @default(false)
   isComingSoon    Boolean          @default(false)
+  isPublished     Boolean          @default(true)
   actualPrice     Decimal?
   ingredients     String?
   testimonials    Json?

@@ -5,6 +5,7 @@ import {
   getProductBySlug,
   updateProduct, 
   deleteProduct,
+  bulkUpdateProducts,
   getCategories,
   createCategory,
   updateCategory,
@@ -110,6 +111,14 @@ router.get("/:slug", getProductBySlug);
  */
 // Note: validate() runs after upload.any() so that body fields from multipart are parsed
 router.post("/", authenticate, authorize("products.create"), upload.any(), validate(CreateProductSchema), createProduct);
+
+/**
+ * @swagger
+ * /api/products/bulk:
+ *   patch:
+ *     summary: Bulk update products
+ */
+router.patch("/bulk", authenticate, authorize("products.update"), bulkUpdateProducts);
 
 /**
  * @swagger
