@@ -126,6 +126,7 @@ export class SeoService {
   static async generateSitemap() {
     const baseUrl = "https://sharcly.com";
     const products = await prisma.product.findMany({ select: { slug: true, updatedAt: true } });
+    const blogs = await prisma.blog.findMany({ select: { slug: true, updatedAt: true } });
     const seoEntries = await prisma.seoMeta.findMany({ select: { pageSlug: true, updatedAt: true } });
 
     let xml = `<?xml version="1.0" encoding="UTF-8"?>\n`;
@@ -133,7 +134,9 @@ export class SeoService {
 
     // Static/Managed Pages
     seoEntries.forEach(entry => {
-      const slug = entry.pageSlug === "home" || entry.pageSlug === "/" ? "" : entry.pageSlug;
+      let slug = entry.pageSlug === "home" || entry.pageSlug === "/" ? "" : entry.pageSlug;
+      if (slug.startsWith("/")) slug = slug.substring(1);
+      
       xml += `  <url>\n`;
       xml += `    <loc>${baseUrl}/${slug}</loc>\n`;
       xml += `    <lastmod>${entry.updatedAt.toISOString()}</lastmod>\n`;
@@ -142,13 +145,55 @@ export class SeoService {
       xml += `  </url>\n`;
     });
 
+    // Unmanaged Static Routes
+    const staticRoutes = [
+      "", "about", "acceptable-use", "account", "balance", "bestsellers", "blogs", 
+      "checkout", "chill", "collections", "contact", "cookies", "disclaimer", "faqs", 
+      "lab-results", "lift", "manufacturing", "new-arrivals", "privacy", "products", 
+      "returns", "sale", "shipping", "shipping-policy", "sleep", "sustainability", 
+      "terms-condition", "vapes", "wholesale"
+    ];
+    
+    const managedSlugs = seoEntries.map(e => {
+      let s = e.pageSlug === "home" || e.pageSlug === "/" ? "" : e.pageSlug;
+      if (s.startsWith("/")) return s.substring(1);
+      return s;
+    });
+
+    staticRoutes.forEach(route => {
+      if (!managedSlugs.includes(route)) {
+        xml += `  <url>\n`;
+        xml += `    <loc>${baseUrl}/${route}</loc>\n`;
+        xml += `    <lastmod>${new Date().toISOString()}</lastmod>\n`;
+        xml += `    <changefreq>weekly</changefreq>\n`;
+        xml += `    <priority>${route === "" ? "1.0" : "0.7"}</priority>\n`;
+        xml += `  </url>\n`;
+      }
+    });
+
     // Dynamic Products
     products.forEach(product => {
+      let slug = product.slug;
+      if (slug.startsWith("/")) slug = slug.substring(1);
+      
       xml += `  <url>\n`;
-      xml += `    <loc>${baseUrl}/products/${product.slug}</loc>\n`;
+      xml += `    <loc>${baseUrl}/products/${slug}</loc>\n`;
       xml += `    <lastmod>${product.updatedAt.toISOString()}</lastmod>\n`;
       xml += `    <changefreq>daily</changefreq>\n`;
       xml += `    <priority>0.9</priority>\n`;
+      xml += `  </url>\n`;
+    });
+
+    // Dynamic Blogs
+    blogs.forEach(blog => {
+      let slug = blog.slug;
+      if (slug.startsWith("/")) slug = slug.substring(1);
+      
+      xml += `  <url>\n`;
+      xml += `    <loc>${baseUrl}/blog/${slug}</loc>\n`;
+      xml += `    <lastmod>${blog.updatedAt.toISOString()}</lastmod>\n`;
+      xml += `    <changefreq>weekly</changefreq>\n`;
+      xml += `    <priority>0.8</priority>\n`;
       xml += `  </url>\n`;
     });
 
