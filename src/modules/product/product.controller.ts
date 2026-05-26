@@ -174,7 +174,7 @@ export const createProduct = async (req: Request, res: Response) => {
       name, subtitle, slug, sku, description, price, actualPrice, stock, categoryId, typeId, tags, collections, flavours,
       status, discountable, weight, length, height, width, originCountry, material, hsCode, midCode,
       metaTitle, metaDescription, keywords, canonicalUrl, ogImage, changefreq,
-      options, metadata, variants, featured, ingredients, testimonials
+      options, metadata, variants, featured, isComingSoon, ingredients, testimonials
     } = req.body;
 
     if (!categoryId) {
@@ -298,6 +298,7 @@ export const createProduct = async (req: Request, res: Response) => {
         options: optionsData,
         metadata: metadataData,
         featured: featured === "true" || featured === true,
+        isComingSoon: isComingSoon === "true" || isComingSoon === true,
         ingredients: ingredients || null,
         testimonials: testimonialsData,
         discountable: discountable === "true" || discountable === true,
@@ -434,7 +435,7 @@ export const updateProduct = async (req: Request, res: Response) => {
       name, subtitle, slug, sku, description, price, actualPrice, stock, categoryId, typeId, tags, collections, flavours,
       status, discountable, weight, length, height, width, originCountry, material, hsCode, midCode,
       metaTitle, metaDescription, keywords, canonicalUrl, ogImage, changefreq,
-      options, metadata, variants, featured, imageOrder, ingredients, testimonials
+      options, metadata, variants, featured, isComingSoon, imageOrder, ingredients, testimonials
     } = req.body;
 
     let tagsArray = undefined;
@@ -614,6 +615,7 @@ export const updateProduct = async (req: Request, res: Response) => {
         options: optionsData,
         metadata: metadataData,
         featured: featured !== undefined ? (featured === "true" || featured === true) : undefined,
+        isComingSoon: isComingSoon !== undefined ? (isComingSoon === "true" || isComingSoon === true) : undefined,
         ingredients: ingredients !== undefined ? (ingredients || null) : undefined,
         testimonials: testimonialsData !== undefined ? testimonialsData : undefined,
         discountable: discountable === "true" || discountable === true,

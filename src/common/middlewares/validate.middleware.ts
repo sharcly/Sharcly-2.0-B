@@ -194,6 +194,10 @@ export const CreateProductSchema = z.object({
     .union([z.boolean(), z.string()])
     .transform((val) => val === true || val === "true")
     .optional(),
+  isComingSoon: z
+    .union([z.boolean(), z.string()])
+    .transform((val) => val === true || val === "true")
+    .optional(),
   flavours: z.union([z.string(), z.array(z.string())]).optional(),
   imageOrder: z.union([z.string(), z.array(z.string())]).optional(),
   faqs: z.union([z.string(), z.array(z.any())]).optional(),
