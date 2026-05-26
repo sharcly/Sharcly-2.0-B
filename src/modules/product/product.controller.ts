@@ -12,6 +12,11 @@ export const getProducts = async (req: Request, res: Response) => {
     const skip = (pageNum - 1) * limitNum;
 
     const where: any = {};
+    
+    // Hide unpublished products from storefront. Dashboard requests will pass dashboard=true
+    if (req.query.dashboard !== "true") {
+      where.isPublished = true;
+    }
     if (featured === "true") {
       where.OR = [
         { featured: true },
@@ -167,6 +172,20 @@ export const getRecommendations = async (req: Request, res: Response) => {
   }
 };
 
+export const bulkUpdateProducts = async (req: Request, res: Response) => {
+  try {
+    const { productIds, isPublished } = req.body;
+    if (!productIds || !Array.isArray(productIds)) {
+      return res.status(400).json({ success: false, message: "productIds array is required" });
+    }
+    
+    await ProductService.bulkUpdateProducts(productIds, isPublished);
+    res.status(200).json({ success: true, message: "Products updated successfully" });
+  } catch (error: any) {
+    console.error("Bulk update error:", error);
+    res.status(500).json({ success: false, message: "Failed to update products", error: error.message });
+  }
+};
 
 export const createProduct = async (req: Request, res: Response) => {
   try {
