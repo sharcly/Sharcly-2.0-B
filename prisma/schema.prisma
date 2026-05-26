@@ -200,10 +200,21 @@ model Order {
   updatedAt         DateTime    @updatedAt
   cancelReason      String?
   items             OrderItem[]
+  statusHistory     OrderStatusHistory[]
   coupon            Coupon?     @relation(fields: [couponId], references: [id])
   user              User        @relation(fields: [userId], references: [id])
 
   @@map("orders")
+}
+
+model OrderStatusHistory {
+  id        String      @id @default(uuid())
+  orderId   String
+  status    OrderStatus
+  createdAt DateTime    @default(now())
+  order     Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@map("order_status_history")
 }
 
 model OrderItem {
