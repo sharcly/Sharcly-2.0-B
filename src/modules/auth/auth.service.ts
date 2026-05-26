@@ -209,8 +209,9 @@ export class AuthService {
       include: { userRole: true }
     });
 
-    if (!user || user.refreshToken !== refreshToken) {
-      throw new Error("Invalid refresh token or user not found");
+    // If refreshToken is null in DB, it means they logged out or reset password
+    if (!user || !user.refreshToken) {
+      throw new Error("Session expired or user logged out");
     }
 
     const roleSlug = user.userRole?.slug || "user";
