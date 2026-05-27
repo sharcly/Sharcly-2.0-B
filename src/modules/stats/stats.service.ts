@@ -160,7 +160,7 @@ export class StatsService {
             createdAt: { gte: startDate, lte: endDate },
             status: OrderStatus.DELIVERED
         },
-        select: { totalAmount: true, createdAt: true },
+        select: { totalAmount: true, createdAt: true, shippingAddress: true },
         orderBy: { createdAt: "asc" }
       }),
       // Top Products
@@ -170,18 +170,6 @@ export class StatsService {
         _sum: { quantity: true },
         orderBy: { _sum: { quantity: 'desc' } },
         take: 5
-      }),
-      // Regional Data (simplified grouping by first part of shipping address if no country field is strictly used or use user's address)
-      // Since shippingAddress is a string, we might just use a placeholder or try to parse.
-      // Let's use a simpler approach: group by country if we had it, but since we don't, we'll return some real but aggregated data if possible.
-      // For now, let's just group by userId to see unique customers.
-      prisma.order.groupBy({
-          by: ['shippingAddress'],
-          where: { createdAt: { gte: startDate, lte: endDate }, status: OrderStatus.DELIVERED },
-          _sum: { totalAmount: true },
-          _count: { id: true },
-          orderBy: { _sum: { totalAmount: 'desc' } },
-          take: 4
       })
     ]);
 
@@ -215,17 +203,24 @@ export class StatsService {
         amount
     })).slice(-7); // Keep it to 7 points for the UI if it's daily
 
-    // 4. Format Regional Data (Mocking names from addresses for now)
-    const regions = regionalData.map(r => {
-        const nameParts = r.shippingAddress.split(',');
-        const regionName = nameParts[nameParts.length - 1].trim() || "Unknown";
-        return {
-            name: regionName,
-            sales: Number(r._sum.totalAmount),
-            growth: 0, // Hard to calculate growth per region without more queries
-            percentage: totalSales === 0 ? 0 : Math.round((Number(r._sum.totalAmount) / totalSales) * 100)
-        };
+    // 4. Format Regional Data (Aggregate correctly in memory)
+    const regionSalesMap: Record<string, number> = {};
+    ordersInPeriod.forEach(order => {
+        const address = order.shippingAddress || "";
+        const nameParts = address.split(',');
+        const regionName = nameParts[nameParts.length - 1]?.trim() || "Unknown";
+        regionSalesMap[regionName] = (regionSalesMap[regionName] || 0) + Number(order.totalAmount);
     });
+
+    const regions = Object.entries(regionSalesMap)
+        .map(([name, sales]) => ({
+            name,
+            sales,
+            growth: 0,
+            percentage: totalSales === 0 ? 0 : Math.round((sales / totalSales) * 100)
+        }))
+        .sort((a, b) => b.sales - a.sales)
+        .slice(0, 4);
 
     // 5. Get Product Details for Top Products
     const productIds = topProducts.map(tp => tp.productId);
