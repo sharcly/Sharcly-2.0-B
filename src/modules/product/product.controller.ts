@@ -17,6 +17,10 @@ export const getProducts = async (req: Request, res: Response) => {
     if (req.query.dashboard !== "true") {
       where.isPublished = true;
     }
+    
+    // Always hide ARCHIVED products unless explicitly requested (could be added later)
+    where.status = { not: "ARCHIVED" };
+
     if (featured === "true") {
       where.OR = [
         { featured: true },
