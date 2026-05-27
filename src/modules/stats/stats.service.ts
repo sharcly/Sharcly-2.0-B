@@ -289,12 +289,40 @@ export class StatsService {
         ? `${peakHour % 12 || 12}:00 ${peakHour >= 12 ? 'PM' : 'AM'} - ${(peakHour + 1) % 12 || 12}:00 ${(peakHour + 1) >= 12 ? 'PM' : 'AM'}`
         : "N/A";
 
-    // 8. Calculate New Customers (First order in this period)
-    const newCustomersCount = await prisma.order.groupBy({
+    // 8. Calculate New Customers (Real count of new users)
+    const newCustomersCount = await prisma.user.count({
+        where: { createdAt: { gte: startDate, lte: endDate }, userRole: { slug: "user" } }
+    });
+    const prevNewCustomersCount = await prisma.user.count({
+        where: { createdAt: { gte: prevStartDate, lte: prevEndDate }, userRole: { slug: "user" } }
+    });
+    const newCustomersGrowth = prevNewCustomersCount === 0 
+        ? (newCustomersCount > 0 ? 100 : 0) 
+        : Number(((newCustomersCount - prevNewCustomersCount) / prevNewCustomersCount * 100).toFixed(1));
+
+    // 9. Real Conversion Rate (Order Success Rate)
+    const totalOrdersInPeriod = await prisma.order.count({ where: { createdAt: { gte: startDate, lte: endDate } } });
+    const successRate = totalOrdersInPeriod > 0 ? ((orderCount / totalOrdersInPeriod) * 100).toFixed(1) + "%" : "0%";
+
+    // 10. Real Retention Rate
+    const uniqueUsersThisPeriod = await prisma.order.groupBy({
         by: ['userId'],
-        where: { createdAt: { gte: startDate, lte: endDate } },
-        _min: { createdAt: true }
-    }).then(groups => groups.length); // This is a simplified version; real one would check if previous orders exist
+        where: { createdAt: { gte: startDate, lte: endDate }, status: OrderStatus.DELIVERED }
+    });
+    let repeatUsers = 0;
+    for (const u of uniqueUsersThisPeriod) {
+        const pastOrders = await prisma.order.count({
+            where: { userId: u.userId, createdAt: { lt: startDate }, status: OrderStatus.DELIVERED }
+        });
+        if (pastOrders > 0) repeatUsers++;
+    }
+    const retentionRate = uniqueUsersThisPeriod.length > 0 
+        ? ((repeatUsers / uniqueUsersThisPeriod.length) * 100).toFixed(1) + "%"
+        : "0%";
+
+    // 11. Refund Rate (Replacing System Health)
+    const cancelledOrders = await prisma.order.count({ where: { status: 'CANCELLED', createdAt: { gte: startDate, lte: endDate } } });
+    const refundRate = totalOrdersInPeriod > 0 ? ((cancelledOrders / totalOrdersInPeriod) * 100).toFixed(1) + "%" : "0%";
 
     const topProduct = products.length > 0 ? products[0].name : "No sales yet";
 
@@ -310,8 +338,11 @@ export class StatsService {
       topProduct,
       topProducts: formattedTopProducts,
       recentTransactions,
-      conversionRate: "2.8%", // Static for now as we don't have session tracking
+      conversionRate: successRate,
+      retentionRate,
+      refundRate,
       newCustomers: newCustomersCount,
+      newCustomersGrowth,
       peakTime: peakTimeLabel
     };
   }
