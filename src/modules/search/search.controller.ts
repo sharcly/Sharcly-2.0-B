@@ -37,7 +37,7 @@ export const universalSearch = async (req: Request, res: Response) => {
           take: 1,
           select: {
             url: true,
-            data: true,
+            id: true,
           },
         },
       },
