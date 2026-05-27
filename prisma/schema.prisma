@@ -221,11 +221,11 @@ model OrderStatusHistory {
 model OrderItem {
   id        String  @id @default(uuid())
   orderId   String
-  productId String
+  productId String?
   quantity  Int
   price     Decimal
   order     Order   @relation(fields: [orderId], references: [id])
-  product   Product @relation(fields: [productId], references: [id])
+  product   Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
 
   @@map("order_items")
 }
