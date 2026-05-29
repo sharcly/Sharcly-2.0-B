@@ -5,7 +5,7 @@ import { ProductService } from "./product.service";
 
 export const getProducts = async (req: Request, res: Response) => {
   try {
-    const { category, flavour, search, sort, page = "1", limit = "10", featured } = req.query;
+    const { category, flavour, search, sort, page = "1", limit = "10", featured, status } = req.query;
 
     const pageNum = Math.max(1, parseInt(page as string) || 1);
     const limitNum = Math.min(Math.max(1, parseInt(limit as string) || 10), 100); // Cap at 100
@@ -13,13 +13,22 @@ export const getProducts = async (req: Request, res: Response) => {
 
     const where: any = {};
     
-    // Hide unpublished products from storefront. Dashboard requests will pass dashboard=true
-    if (req.query.dashboard !== "true") {
+    // Handle status filtering
+    if (status === "published") {
       where.isPublished = true;
+      where.status = "PUBLISHED";
+    } else if (status === "draft") {
+      where.isPublished = false;
+      where.status = "DRAFT";
+    } else if (status === "archived") {
+      where.status = "ARCHIVED";
+    } else {
+      where.status = { not: "ARCHIVED" };
+      // Hide unpublished products from storefront if not in dashboard mode
+      if (req.query.dashboard !== "true") {
+        where.isPublished = true;
+      }
     }
-    
-    // Always hide ARCHIVED products unless explicitly requested (could be added later)
-    where.status = { not: "ARCHIVED" };
 
     if (featured === "true") {
       where.OR = [
@@ -66,7 +75,7 @@ export const getProducts = async (req: Request, res: Response) => {
             select: { id: true, isThumbnail: true, order: true, mimeType: true }
           }
         },
-        orderBy: sort === "price-asc" ? { price: "asc" } : sort === "price-desc" ? { price: "desc" } : { createdAt: "desc" }
+        orderBy: sort === "price-asc" ? { price: "asc" } : sort === "price-desc" ? { price: "desc" } : sort === "oldest" ? { createdAt: "asc" } : { createdAt: "desc" }
       }),
       prisma.product.count({ where })
     ]);

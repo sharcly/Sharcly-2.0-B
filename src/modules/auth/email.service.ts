@@ -10,7 +10,8 @@ if (!apiKey || apiKey === "re_...") {
 
 const resend = apiKey && apiKey !== "re_..." ? new Resend(apiKey) : null;
 const fromEmail = process.env.RESEND_FROM_EMAIL ;
-const logoUrl = "https://cdn.mignite.app/ws/works_01KM0WR2ZSKYNHV0ZE2MPNM9EF/final-Logo-1--01KM5Y2NCW8720B30G9G0XW18Y.png";
+const frontendUrl = (process.env.FRONTEND_URL || "https://sharcly.com").replace(/\/$/, "");
+const logoUrl = `${frontendUrl}/assets/final-Logo-1.png`;
 
 const baseTemplate = (title: string, content: string, cta?: { text: string; url: string }, footer?: string) => `
   <div style="font-family: 'Inter', sans-serif; background-color: #FDFDFB; padding: 40px 20px;">
@@ -46,7 +47,7 @@ export const sendVerificationEmail = async (email: string, token: string) => {
     console.error("❌ Resend client not initialized. Cannot send verification email to:", email);
     return;
   }
-  const verificationUrl = `${process.env.FRONTEND_URL}/verify-email?token=${token}`;
+  const verificationUrl = `${frontendUrl}/verify-email?token=${token}`;
   
   try {
     const { data, error } = await resend.emails.send({
@@ -98,7 +99,7 @@ export const sendOrderConfirmation = async (email: string, orderDetails: any) =>
         </div>
         <p>An invoice has been attached to this email for your records. We'll notify you as soon as your package ships!</p>
         `,
-        { text: "View Order Details", url: `${process.env.FRONTEND_URL}/account` }
+        { text: "View Order Details", url: `${frontendUrl}/account` }
       ),
     });
   } catch (error) {
@@ -152,7 +153,7 @@ export const sendOrderStatusUpdate = async (email: string, order: any) => {
         </div>
         <p style="text-align: center; color: #666;">${statusMessage}</p>
         `,
-        { text: "View Order Details", url: `${process.env.FRONTEND_URL}/account` }
+        { text: "View Order Details", url: `${frontendUrl}/account` }
       ),
     });
   } catch (error) {
@@ -183,7 +184,7 @@ export const sendShippingNotificationEmail = async (email: string, order: any) =
         </div>
         <p>You can track your package's progress by clicking the button below.</p>
         `,
-        { text: "Track Package", url: `${process.env.FRONTEND_URL}/account` }
+        { text: "Track Package", url: `${frontendUrl}/account` }
       ),
     });
   } catch (error) {
@@ -211,7 +212,7 @@ export const sendOrderCancellationEmail = async (email: string, order: any, reas
         </div>
         <p>If you have already been charged, a refund will be processed automatically within 5-10 business days. We apologize for any inconvenience.</p>
         `,
-        { text: "Visit Store", url: `${process.env.FRONTEND_URL}/products` }
+        { text: "Visit Store", url: `${frontendUrl}/products` }
       ),
     });
   } catch (error) {
@@ -237,7 +238,7 @@ export const sendOrderDeliveredEmail = async (email: string, order: any) => {
         <p>If you have any issues with your delivery or the products, please reply to this email or contact our support team.</p>
         <p><strong>Loved your experience?</strong> We'd love to hear your feedback.</p>
         `,
-        { text: "Write a Review", url: `${process.env.FRONTEND_URL}/products` }
+        { text: "Write a Review", url: `${frontendUrl}/products` }
       ),
     });
   } catch (error) {
@@ -247,7 +248,7 @@ export const sendOrderDeliveredEmail = async (email: string, order: any) => {
 
 export const sendPasswordResetEmail = async (email: string, token: string) => {
   if (!resend) return;
-  const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${token}`;
+  const resetUrl = `${frontendUrl}/reset-password?token=${token}`;
   
   await resend.emails.send({
     from: fromEmail,
@@ -281,7 +282,7 @@ export const sendWelcomeCoupon = async (email: string, couponCode: string, disco
         <p style="font-size: 14px; color: #062D1B; opacity: 0.6; margin-top: 10px;">Use this code for <strong>${discountDisplay} OFF</strong> your first order.</p>
       </div>
       `,
-      { text: "Shop Our Collection", url: `${process.env.FRONTEND_URL}/products` }
+      { text: "Shop Our Collection", url: `${frontendUrl}/products` }
     ),
   });
 };
