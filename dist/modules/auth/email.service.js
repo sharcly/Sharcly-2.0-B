@@ -8,7 +8,7 @@ if (!apiKey || apiKey === "re_...") {
     console.warn("⚠️  RESEND_API_KEY is missing or invalid. Email services will be disabled.");
 }
 const resend = apiKey && apiKey !== "re_..." ? new resend_1.Resend(apiKey) : null;
-const fromEmail = process.env.RESEND_FROM_EMAIL || "Sharcly <onboarding@resend.dev>";
+const fromEmail = process.env.RESEND_FROM_EMAIL;
 const logoUrl = "https://cdn.mignite.app/ws/works_01KM0WR2ZSKYNHV0ZE2MPNM9EF/final-Logo-1--01KM5Y2NCW8720B30G9G0XW18Y.png";
 const baseTemplate = (title, content, cta, footer) => `
   <div style="font-family: 'Inter', sans-serif; background-color: #FDFDFB; padding: 40px 20px;">
