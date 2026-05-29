@@ -50,6 +50,12 @@ export const getProducts = async (req: Request, res: Response) => {
       }
     }
 
+    if (req.query.minPrice || req.query.maxPrice) {
+      where.price = {};
+      if (req.query.minPrice) where.price.gte = parseFloat(req.query.minPrice as string);
+      if (req.query.maxPrice) where.price.lte = parseFloat(req.query.maxPrice as string);
+    }
+
     const [products, total] = await Promise.all([
       prisma.product.findMany({
         where,
