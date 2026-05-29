@@ -101,8 +101,9 @@ export const getProducts = async (req: Request, res: Response) => {
 export const getProductBySlug = async (req: Request, res: Response) => {
   try {
     const { slug } = req.params;
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(slug);
     const product = await prisma.product.findUnique({
-      where: { slug: slug as string },
+      where: isUuid ? { id: slug } : { slug: slug as string },
       include: {
         category: true,
         variants: true,

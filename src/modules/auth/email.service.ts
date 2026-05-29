@@ -56,7 +56,7 @@ export const sendVerificationEmail = async (email: string, token: string) => {
       html: baseTemplate(
         "Welcome to Sharcly!",
         "Thank you for joining us. Please verify your email address to get full access to your account and start shopping our premium collection.",
-        { text: "Verify Email Address", url: verificationUrl },
+    
         "If you didn't create an account, you can safely ignore this email."
       ),
     });
