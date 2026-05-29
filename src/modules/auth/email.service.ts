@@ -9,7 +9,7 @@ if (!apiKey || apiKey === "re_...") {
 }
 
 const resend = apiKey && apiKey !== "re_..." ? new Resend(apiKey) : null;
-const fromEmail = process.env.RESEND_FROM_EMAIL || "Sharcly <onboarding@resend.dev>";
+const fromEmail = process.env.RESEND_FROM_EMAIL ;
 const logoUrl = "https://cdn.mignite.app/ws/works_01KM0WR2ZSKYNHV0ZE2MPNM9EF/final-Logo-1--01KM5Y2NCW8720B30G9G0XW18Y.png";
 
 const baseTemplate = (title: string, content: string, cta?: { text: string; url: string }, footer?: string) => `
@@ -35,7 +35,7 @@ const baseTemplate = (title: string, content: string, cta?: { text: string; url:
       ` : ""}
       
       <div style="margin-top: 40px; padding-top: 24px; border-top: 1px solid #eee; text-align: center;">
-        <p style="color: #999; font-size: 12px;">${footer || "© 2024 Sharcly Essentials. Pure. Lab Verified."}</p>
+        <p style="color: #999; font-size: 12px;">${footer || "© 2024 Sharcly Essentials. Pure. Third Party Lab Verified."}</p>
       </div>
     </div>
   </div>
