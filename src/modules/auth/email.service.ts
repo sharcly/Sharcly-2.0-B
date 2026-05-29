@@ -1,6 +1,7 @@
 import { Resend } from "resend";
 import { InvoiceService } from "../order/invoice.service";
 import { Readable } from "stream";
+import { prisma } from "../../common/lib/prisma";
 
 const apiKey = process.env.RESEND_API_KEY;
 
@@ -76,26 +77,62 @@ export const sendOrderConfirmation = async (email: string, orderDetails: any) =>
   if (!resend) return;
 
   try {
-    const invoiceBuffer = await InvoiceService.generateInvoiceBuffer(orderDetails);
+    const order = await prisma.order.findUnique({
+      where: { id: orderDetails.id },
+      include: {
+        user: { select: { name: true, email: true } },
+        items: { include: { product: true } }
+      }
+    });
+
+    if (!order) {
+      console.error(`❌ Order not found for confirmation email: ${orderDetails.id}`);
+      return;
+    }
+
+    const itemsHtml = order.items.map((item: any) => `
+      <div style="display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #eee;">
+        <div style="text-align: left;">
+          <p style="margin: 0; font-weight: 700; color: #062D1B; font-size: 14px;">${item.product?.name || "Product"}</p>
+          <p style="margin: 4px 0 0 0; color: #666; font-size: 12px;">Qty: ${item.quantity} x $${Number(item.price).toFixed(2)}</p>
+        </div>
+        <div style="font-weight: 700; color: #062D1B; font-size: 14px;">
+          $${(Number(item.price) * item.quantity).toFixed(2)}
+        </div>
+      </div>
+    `).join("");
+
+    const invoiceBuffer = await InvoiceService.generateInvoiceBuffer(order);
     
     await resend.emails.send({
       from: fromEmail,
       to: email,
-      subject: `Order Confirmation - #${orderDetails.id.slice(0, 8)}`,
+      subject: `Order Confirmation - #${order.id.slice(0, 8)}`,
       attachments: [
         {
-          filename: `invoice-${orderDetails.id.slice(0, 8)}.pdf`,
+          filename: `invoice-${order.id.slice(0, 8)}.pdf`,
           content: invoiceBuffer,
         },
       ],
       html: baseTemplate(
         "Thank you for your order!",
         `
-        <p>Your order <strong>#${orderDetails.id.slice(0, 8)}</strong> has been placed successfully.</p>
-        <div style="background: #f9f9f9; padding: 20px; border-radius: 16px; margin: 20px 0; text-align: left;">
-          <p style="margin: 5px 0;"><strong>Items:</strong> ${orderDetails.items.length}</p>
-          <p style="margin: 5px 0;"><strong>Total Amount:</strong> $${Number(orderDetails.totalAmount).toFixed(2)}</p>
-          <p style="margin: 5px 0;"><strong>Shipping To:</strong> ${orderDetails.address}</p>
+        <p>Your order <strong>#${order.id.slice(0, 8)}</strong> has been placed successfully.</p>
+        
+        <div style="background: #f9f9f9; padding: 24px; border-radius: 16px; margin: 24px 0;">
+          <h3 style="margin-top: 0; color: #062D1B; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid #ddd; padding-bottom: 8px;">Order Details</h3>
+          ${itemsHtml}
+          
+          <div style="margin-top: 16px; text-align: right;">
+            <p style="margin: 4px 0; font-size: 13px; color: #666;">Subtotal: $${(Number(order.totalAmount) - Number(order.taxAmount || 0) - Number(order.shippingAmount || 0)).toFixed(2)}</p>
+            ${Number(order.taxAmount) > 0 ? `<p style="margin: 4px 0; font-size: 13px; color: #666;">Tax: $${Number(order.taxAmount).toFixed(2)}</p>` : ""}
+            ${Number(order.shippingAmount) > 0 ? `<p style="margin: 4px 0; font-size: 13px; color: #666;">Shipping: $${Number(order.shippingAmount).toFixed(2)}</p>` : ""}
+            <p style="margin: 8px 0 0 0; font-weight: 800; font-size: 16px; color: #062D1B;">Total: $${Number(order.totalAmount).toFixed(2)}</p>
+          </div>
+        </div>
+
+        <div style="background: #f9f9f9; padding: 20px; border-radius: 16px; margin: 24px 0; text-align: left;">
+          <p style="margin: 4px 0; font-size: 14px; color: #062D1B;"><strong>Shipping To:</strong> ${order.address}</p>
         </div>
         <p>An invoice has been attached to this email for your records. We'll notify you as soon as your package ships!</p>
         `,
@@ -107,21 +144,34 @@ export const sendOrderConfirmation = async (email: string, orderDetails: any) =>
   }
 };
 
-export const sendOrderStatusUpdate = async (email: string, order: any) => {
+export const sendOrderStatusUpdate = async (email: string, orderDetails: any) => {
   if (!resend) return;
 
-  // Delegate to specific functions for major status changes
-  if (order.status === "SHIPPED") {
-    return await sendShippingNotificationEmail(email, order);
-  }
-  if (order.status === "CANCELLED") {
-    return await sendOrderCancellationEmail(email, order, order.cancelReason || "Customer request");
-  }
-  if (order.status === "DELIVERED") {
-    return await sendOrderDeliveredEmail(email, order);
-  }
-
   try {
+    const order = await prisma.order.findUnique({
+      where: { id: orderDetails.id },
+      include: {
+        user: { select: { name: true, email: true } },
+        items: { include: { product: true } }
+      }
+    });
+
+    if (!order) {
+      console.error(`❌ Order not found for status update email: ${orderDetails.id}`);
+      return;
+    }
+
+    // Delegate to specific functions for major status changes
+    if (order.status === "SHIPPED") {
+      return await sendShippingNotificationEmail(email, order);
+    }
+    if (order.status === "CANCELLED") {
+      return await sendOrderCancellationEmail(email, order, order.cancelReason || "Customer request");
+    }
+    if (order.status === "DELIVERED") {
+      return await sendOrderDeliveredEmail(email, order);
+    }
+
     let attachments: any[] = [];
     let statusMessage = "We're working on your order.";
     let statusTitle = `Order Status: ${order.status}`;
