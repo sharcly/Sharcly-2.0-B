@@ -126,7 +126,10 @@ export class ProductService {
   static async bulkUpdateProducts(productIds: string[], isPublished: boolean) {
     return await prisma.product.updateMany({
       where: { id: { in: productIds } },
-      data: { isPublished }
+      data: { 
+        isPublished,
+        status: isPublished ? "PUBLISHED" : "DRAFT"
+      }
     });
   }
 
