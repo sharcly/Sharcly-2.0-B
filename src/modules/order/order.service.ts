@@ -136,7 +136,7 @@ export class OrderService {
     for (const item of totals.items) {
       const product = await prisma.product.findUnique({ where: { id: item.productId } });
       const variant = item.variantId ? await prisma.productVariant.findUnique({ where: { id: item.variantId } }) : null;
-      const targetStock = variant ? variant.inventoryQuantity : (product?.stock || 0);
+      const targetStock = Math.max(variant?.inventoryQuantity || 0, product?.stock || 0);
       
       if (targetStock < item.quantity) {
         throw new Error(`Insufficient stock for ${item.name}`);
@@ -186,12 +186,19 @@ export class OrderService {
 
       // Update stock
       for (const item of totals.items) {
+        let decrementedVariant = false;
         if (item.variantId) {
-          await tx.productVariant.update({
-            where: { id: item.variantId },
-            data: { inventoryQuantity: { decrement: item.quantity } }
-          });
-        } else {
+          const variant = await tx.productVariant.findUnique({ where: { id: item.variantId } });
+          if (variant && variant.inventoryQuantity > 0) {
+            await tx.productVariant.update({
+              where: { id: item.variantId },
+              data: { inventoryQuantity: { decrement: item.quantity } }
+            });
+            decrementedVariant = true;
+          }
+        }
+        
+        if (!decrementedVariant) {
           await tx.product.update({
             where: { id: item.productId },
             data: { stock: { decrement: item.quantity } }
