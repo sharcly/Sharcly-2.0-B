@@ -113,4 +113,14 @@ router.get("/:id", auth_middleware_1.authenticate, order_controller_1.getOrderBy
  *         description: Order status updated successfully
  */
 router.patch("/:id/status", auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)("orders.manage"), (0, validate_middleware_1.validate)(validate_middleware_1.UpdateOrderStatusSchema), order_controller_1.updateOrderStatus);
+/**
+ * @swagger
+ * /api/orders/{id}/invoice:
+ *   get:
+ *     summary: Download order invoice PDF
+ *     tags: [Orders]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.get("/:id/invoice", auth_middleware_1.authenticate, order_controller_1.downloadInvoice);
 exports.default = router;

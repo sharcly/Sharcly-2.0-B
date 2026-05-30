@@ -1,5 +1,7 @@
+import { Request, Response } from "express";
 import { OrderService } from "./order.service";
 import { InvoiceService } from "./invoice.service";
+import { PaymentService } from "../payment/payment.service";
 
 export const createOrder = async (req: any, res: Response) => {
   try {
@@ -13,7 +15,48 @@ export const createOrder = async (req: any, res: Response) => {
     }
 
     const order = await OrderService.createOrder(userId, email, orderData);
-    res.status(201).json({ success: true, order });
+
+    let clientSecret: string | undefined = undefined;
+    let directPaymentSuccess = false;
+
+    if (orderData.paymentMethod === "online") {
+      const activeGateway = await PaymentService.getActiveGatewayForCheckout();
+
+      if (activeGateway.gatewayName === "stripe") {
+        // Stripe uses client elements flow, return clientSecret
+        const paymentIntent = await PaymentService.createPaymentIntent(
+          Number(order.totalAmount),
+          "usd",
+          { orderId: order.id },
+          activeGateway.gatewayId
+        );
+        clientSecret = paymentIntent.client_secret;
+      } else {
+        // Direct merchant card payment
+        if (!orderData.cardData) {
+          throw new Error("Credit Card details are required for online checkout.");
+        }
+
+        const chargeResult = await PaymentService.chargeCard(
+          Number(order.totalAmount),
+          "usd",
+          orderData.cardData,
+          order.id,
+          activeGateway.gatewayId
+        );
+
+        const okStatuses = ["COMPLETED", "captured", "authorized_completed", "approved"];
+        if (chargeResult && okStatuses.includes(chargeResult.status)) {
+          directPaymentSuccess = true;
+          // Set status to CONFIRMED
+          await OrderService.updateOrderStatus(order.id, { status: "CONFIRMED" });
+        } else {
+          throw new Error("Direct merchant card authorization failed.");
+        }
+      }
+    }
+
+    res.status(201).json({ success: true, order, clientSecret, directPaymentSuccess });
   } catch (error: any) {
     res.status(400).json({ message: error.message || "Order placement failed" });
   }

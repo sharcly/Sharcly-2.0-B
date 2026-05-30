@@ -31,7 +31,7 @@ export class MarketingController {
 
   static async updateOffer(req: Request, res: Response) {
     try {
-      const offer = await MarketingService.updateOffer(req.params.id, req.body);
+      const offer = await MarketingService.updateOffer(req.params.id as string, req.body);
       res.json(offer);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -40,7 +40,7 @@ export class MarketingController {
 
   static async deleteOffer(req: Request, res: Response) {
     try {
-      await MarketingService.deleteOffer(req.params.id);
+      await MarketingService.deleteOffer(req.params.id as string);
       res.json({ message: "Offer deleted successfully" });
     } catch (error: any) {
       res.status(500).json({ message: error.message });

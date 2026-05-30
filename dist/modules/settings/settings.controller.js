@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getRefundReasons = exports.getReturnReasons = exports.createRegion = exports.getRegions = exports.updateStoreSettings = exports.getStoreSettings = void 0;
+exports.getRefundReasons = exports.getReturnReasons = exports.deleteRegion = exports.createRegion = exports.getRegions = exports.updateStoreSettings = exports.getStoreSettings = void 0;
 const settings_service_1 = require("./settings.service");
 const getStoreSettings = async (req, res) => {
     try {
@@ -43,6 +43,17 @@ const createRegion = async (req, res) => {
     }
 };
 exports.createRegion = createRegion;
+const deleteRegion = async (req, res) => {
+    try {
+        const id = req.params.id;
+        await settings_service_1.SettingsService.deleteRegion(id);
+        res.status(200).json({ success: true, message: "Region deleted" });
+    }
+    catch (error) {
+        res.status(500).json({ message: "Failed to delete region" });
+    }
+};
+exports.deleteRegion = deleteRegion;
 const getReturnReasons = async (req, res) => {
     try {
         const reasons = await settings_service_1.SettingsService.getReturnReasons();

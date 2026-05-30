@@ -40,7 +40,7 @@ export const createRegion = async (req: Request, res: Response) => {
 
 export const deleteRegion = async (req: Request, res: Response) => {
   try {
-    const { id } = req.params;
+    const id = req.params.id as string;
     await SettingsService.deleteRegion(id);
     res.status(200).json({ success: true, message: "Region deleted" });
   } catch (error) {

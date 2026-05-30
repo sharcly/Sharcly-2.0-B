@@ -60,6 +60,7 @@ model User {
   reviews           Review[]
   userRole          Role?     @relation(fields: [roleId], references: [id])
   wishlist          Product[] @relation("UserWishlist")
+  paymentIntegrations PaymentIntegration[]
 
   @@map("users")
 }
@@ -199,11 +200,11 @@ model Order {
 model OrderItem {
   id        String  @id @default(uuid())
   orderId   String
-  productId String
+  productId String?
   quantity  Int
   price     Decimal
   order     Order   @relation(fields: [orderId], references: [id])
-  product   Product @relation(fields: [productId], references: [id])
+  product   Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
 
   @@map("order_items")
 }
@@ -474,6 +475,7 @@ enum OrderStatus {
 enum ProductStatus {
   DRAFT
   PUBLISHED
+  ARCHIVED
 }
 
 enum BlogStatus {
@@ -536,10 +538,40 @@ model ApiIntegration {
 
 model Otp {
   id        String   @id @default(uuid())
-  email     String
+  email     String   @unique
   code      String
   expiresAt DateTime
   createdAt DateTime @default(now())
 
   @@map("otps")
+}
+
+model PaymentIntegration {
+  id                   String    @id @default(uuid())
+  userId               String    @map("user_id")
+  gatewayName          String    @unique @map("gateway_name")
+  authType             String    @map("auth_type")
+  accessToken          String?   @map("access_token")
+  refreshToken         String?   @map("refresh_token")
+  encryptedCredentials String?   @map("encrypted_credentials")
+  merchantId           String?   @map("merchant_id")
+  status               String    @default("DISCONNECTED")
+  webhookStatus        String    @default("INACTIVE")
+  lastSyncAt           DateTime? @map("last_sync_at")
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
+  user                 User      @relation(fields: [userId], references: [id])
+
+  @@map("payment_integrations")
+}
+
+model IntegrationAuditLog {
+  id          String   @id @default(uuid())
+  gatewayName String   @map("gateway_name")
+  action      String
+  status      String
+  details     String?  @db.Text
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@map("integration_audit_logs")
 }
