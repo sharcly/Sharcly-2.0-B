@@ -3,7 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const product_controller_1 = require("./product.controller");
 const auth_middleware_1 = require("../../common/middlewares/auth.middleware");
-const multer_1 = require("../../common/utils/multer");
+const cloudinary_1 = require("../../common/utils/cloudinary");
 const validate_middleware_1 = require("../../common/middlewares/validate.middleware");
 const router = (0, express_1.Router)();
 /**
@@ -48,7 +48,6 @@ router.get("/categories", product_controller_1.getCategories);
 router.get("/collections", product_controller_1.getCollections);
 router.get("/tags", product_controller_1.getTags);
 router.get("/types", product_controller_1.getTypes);
-router.get("/flavours", product_controller_1.getFlavours);
 router.get("/:slug", product_controller_1.getProductBySlug);
 /**
  * @swagger
@@ -81,7 +80,7 @@ router.get("/:slug", product_controller_1.getProductBySlug);
  *         description: Forbidden (Admin/Manager only)
  */
 // Note: validate() runs after upload.any() so that body fields from multipart are parsed
-router.post("/", auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)("products.create"), multer_1.upload.any(), (0, validate_middleware_1.validate)(validate_middleware_1.CreateProductSchema), product_controller_1.createProduct);
+router.post("/", auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)("products.create"), cloudinary_1.upload.any(), (0, validate_middleware_1.validate)(validate_middleware_1.CreateProductSchema), product_controller_1.createProduct);
 /**
  * @swagger
  * /api/products/{id}:
@@ -100,7 +99,7 @@ router.post("/", auth_middleware_1.authenticate, (0, auth_middleware_1.authorize
  *       200:
  *         description: Product updated successfully
  */
-router.patch("/:id", auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)("products.update"), multer_1.upload.any(), (0, validate_middleware_1.validate)(validate_middleware_1.UpdateProductSchema), product_controller_1.updateProduct);
+router.patch("/:id", auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)("products.update"), cloudinary_1.upload.any(), (0, validate_middleware_1.validate)(validate_middleware_1.UpdateProductSchema), product_controller_1.updateProduct);
 /**
  * @swagger
  * /api/products/{id}:
@@ -178,7 +177,4 @@ router.patch("/collections/:id", auth_middleware_1.authenticate, (0, auth_middle
 router.delete("/collections/:id", auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)("categories.manage"), product_controller_1.deleteCollection);
 router.post("/tags", auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)("products.update"), product_controller_1.createTag);
 router.post("/types", auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)("products.update"), product_controller_1.createType);
-router.post("/flavours", auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)("categories.manage"), product_controller_1.createFlavour);
-router.patch("/flavours/:id", auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)("categories.manage"), product_controller_1.updateFlavour);
-router.delete("/flavours/:id", auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)("categories.manage"), product_controller_1.deleteFlavour);
 exports.default = router;

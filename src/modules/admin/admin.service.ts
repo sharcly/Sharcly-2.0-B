@@ -54,8 +54,7 @@ export class AdminService {
   }
 
   static async createUser(userData: any) {
-    const { password, name, roleId } = userData;
-    const email = userData.email?.toLowerCase().trim();
+    const { email, password, name, roleId } = userData;
 
     const roleExists = await prisma.role.findUnique({ where: { id: roleId } });
     if (!roleExists) {
@@ -90,8 +89,7 @@ export class AdminService {
   }
 
   static async updateUser(id: string, updateData: any) {
-    const { password, name, roleId } = updateData;
-    const email = updateData.email?.toLowerCase().trim();
+    const { email, password, name, roleId } = updateData;
 
     const prismaUpdateData: any = {};
     if (email) prismaUpdateData.email = email;
@@ -223,60 +221,5 @@ export class AdminService {
 
   static async deleteIntegration(id: string) {
     return await (prisma as any).apiIntegration.delete({ where: { id } });
-  }
-
-  static async getAllPaymentGateways() {
-    return await prisma.paymentGateway.findMany({
-      orderBy: { createdAt: "desc" }
-    });
-  }
-
-  static async createPaymentGateway(data: any) {
-    const { name, provider, publishableKey, secretKey, webhookSecret, config, rotationLimit, isActive } = data;
-    return await prisma.paymentGateway.create({
-      data: {
-        name,
-        provider,
-        publishableKey,
-        secretKey,
-        webhookSecret,
-        config: config || {},
-        rotationLimit: rotationLimit ? parseInt(rotationLimit, 10) : 10,
-        isActive: isActive !== undefined ? isActive : true
-      }
-    });
-  }
-
-  static async updatePaymentGateway(id: string, data: any) {
-    const { name, provider, publishableKey, secretKey, webhookSecret, config, rotationLimit, isActive } = data;
-    const updateData: any = {};
-    if (name !== undefined) updateData.name = name;
-    if (provider !== undefined) updateData.provider = provider;
-    if (publishableKey !== undefined) updateData.publishableKey = publishableKey;
-    if (secretKey !== undefined) updateData.secretKey = secretKey;
-    if (webhookSecret !== undefined) updateData.webhookSecret = webhookSecret;
-    if (config !== undefined) updateData.config = config;
-    if (rotationLimit !== undefined) updateData.rotationLimit = parseInt(rotationLimit, 10);
-    if (isActive !== undefined) updateData.isActive = isActive;
-
-    return await prisma.paymentGateway.update({
-      where: { id },
-      data: updateData
-    });
-  }
-
-  static async deletePaymentGateway(id: string) {
-    return await prisma.paymentGateway.delete({
-      where: { id }
-    });
-  }
-
-  static async resetPaymentGatewayCounter(id: string) {
-    return await prisma.paymentGateway.update({
-      where: { id },
-      data: {
-        paymentCount: 0
-      }
-    });
   }
 }

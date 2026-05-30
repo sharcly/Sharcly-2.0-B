@@ -5,10 +5,8 @@ export async function bootstrap() {
   console.log("🚀 Initializing system bootstrap...");
 
   try {
-    const adminEmail = (process.env.ADMIN_EMAIL || "admin@sharcly.com").toLowerCase().trim();
+    const adminEmail = process.env.ADMIN_EMAIL || "admin@sharcly.com";
     const adminPassword = process.env.ADMIN_PASSWORD;
-    const forceReset = process.env.FORCE_ADMIN_RESET === "true";
-
     if (!adminPassword) {
       console.error("❌ ADMIN_PASSWORD env var is not set. Skipping admin creation for security.");
       return;
@@ -38,16 +36,14 @@ export async function bootstrap() {
         },
       });
       console.log("✅ Default admin created successfully.");
-    } else if (forceReset) {
-      console.log("ℹ️ Force resetting admin password to match environment.");
+    } else {
+      console.log("ℹ️ Admin already exists, updating password to match environment.");
       const hashedPassword = await bcrypt.hash(adminPassword, 12);
       await prisma.user.update({
         where: { email: adminEmail },
         data: { password: hashedPassword }
       });
       console.log("✅ Admin password synchronized.");
-    } else {
-      console.log("ℹ️ Admin already exists. Skipping password synchronization to preserve manual changes.");
     }
 
     // Manager Account

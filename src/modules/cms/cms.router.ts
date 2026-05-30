@@ -1,23 +1,66 @@
 import { Router } from "express";
-import { getPageContent, updateContent, uploadCmsImage, uploadCmsVideo, getHeroVideo, streamVideo, deleteCmsVideo } from "./cms.controller";
+import { 
+  getPageContent, 
+  updateContent 
+} from "./cms.controller";
 import { authenticate, authorize } from "../../common/middlewares/auth.middleware";
-import { validate, CmsBulkUpdateSchema } from "../../common/middlewares/validate.middleware";
-import { upload } from "../../common/utils/multer";
-import { uploadVideo } from "../../common/utils/multer-video";
 
 const router = Router();
 
-// Public video routes (must be before /:page wildcard)
-router.get("/video/hero", getHeroVideo);
-router.get("/video/stream/:id", streamVideo);
+/**
+ * @swagger
+ * tags:
+ *   name: CMS
+ *   description: Website Content Management System
+ */
 
-// Admin routes
-router.post("/update", authenticate, authorize("cms.manage"), validate(CmsBulkUpdateSchema), updateContent);
-router.post("/upload", authenticate, authorize("cms.manage"), upload.single("image"), uploadCmsImage);
-router.post("/video/upload", authenticate, authorize("cms.manage"), uploadVideo.single("video"), uploadCmsVideo);
-router.delete("/video/:id", authenticate, authorize("cms.manage"), deleteCmsVideo);
-
-// Public page content route (wildcard - must be last)
+/**
+ * @swagger
+ * /api/cms/{page}:
+ *   get:
+ *     summary: Get dynamic content for a page
+ *     tags: [CMS]
+ *     parameters:
+ *       - in: path
+ *         name: page
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Page content retrieved successfully
+ */
 router.get("/:page", getPageContent);
+
+/**
+ * @swagger
+ * /api/cms:
+ *   patch:
+ *     summary: Update website content
+ *     tags: [CMS]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               page: { type: string }
+ *               updates: 
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     section: { type: string }
+ *                     key: { type: string }
+ *                     value: { type: string }
+ *                     type: { type: string }
+ *     responses:
+ *       200:
+ *         description: Content updated successfully
+ */
+router.patch("/", authenticate, authorize("cms.manage"), updateContent);
 
 export default router;

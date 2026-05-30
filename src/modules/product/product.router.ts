@@ -5,7 +5,6 @@ import {
   getProductBySlug,
   updateProduct, 
   deleteProduct,
-  bulkUpdateProducts,
   getCategories,
   createCategory,
   updateCategory,
@@ -18,15 +17,10 @@ import {
   getTags,
   createTag,
   getTypes,
-  createType,
-  getFlavours,
-  createFlavour,
-  updateFlavour,
-  deleteFlavour,
-  getRecommendations
+  createType
 } from "./product.controller";
 import { authenticate, authorize } from "../../common/middlewares/auth.middleware";
-import { upload } from "../../common/utils/multer";
+import { upload } from "../../common/utils/cloudinary";
 import { validate, CreateProductSchema, UpdateProductSchema } from "../../common/middlewares/validate.middleware";
 
 const router = Router();
@@ -75,8 +69,6 @@ router.get("/categories", getCategories);
 router.get("/collections", getCollections);
 router.get("/tags", getTags);
 router.get("/types", getTypes);
-router.get("/flavours", getFlavours);
-router.get("/recommendations", getRecommendations);
 router.get("/:slug", getProductBySlug);
 
 /**
@@ -111,14 +103,6 @@ router.get("/:slug", getProductBySlug);
  */
 // Note: validate() runs after upload.any() so that body fields from multipart are parsed
 router.post("/", authenticate, authorize("products.create"), upload.any(), validate(CreateProductSchema), createProduct);
-
-/**
- * @swagger
- * /api/products/bulk:
- *   patch:
- *     summary: Bulk update products
- */
-router.patch("/bulk", authenticate, authorize("products.update"), bulkUpdateProducts);
 
 /**
  * @swagger
@@ -228,8 +212,5 @@ router.post("/tags", authenticate, authorize("products.update"), createTag);
 
 router.post("/types", authenticate, authorize("products.update"), createType);
 
-router.post("/flavours", authenticate, authorize("categories.manage"), createFlavour);
-router.patch("/flavours/:id", authenticate, authorize("categories.manage"), updateFlavour);
-router.delete("/flavours/:id", authenticate, authorize("categories.manage"), deleteFlavour);
 
 export default router;

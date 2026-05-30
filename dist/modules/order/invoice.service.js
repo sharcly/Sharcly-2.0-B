@@ -6,8 +6,6 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.InvoiceService = void 0;
 const pdfkit_1 = __importDefault(require("pdfkit"));
 const date_fns_1 = require("date-fns");
-const fs_1 = __importDefault(require("fs"));
-const path_1 = __importDefault(require("path"));
 class InvoiceService {
     static async generateInvoiceBuffer(order) {
         return new Promise((resolve, reject) => {
@@ -46,16 +44,10 @@ class InvoiceService {
             .text("150 Elgin Street, Ottawa, ON", margin, 55)
             .text("Canada | hello@sharcly.com", margin, 65);
         // Logo (Right)
-        const logoPath = path_1.default.join(__dirname, "../../../../frontend/public/assets/final-Logo-1.png");
-        if (fs_1.default.existsSync(logoPath)) {
-            doc.image(logoPath, pageWidth - margin - 80, 25, { width: 80 });
-        }
-        else {
-            doc
-                .font("Helvetica-Bold")
-                .fontSize(24)
-                .text("sharcly", pageWidth - margin - 100, 30, { align: "right", width: 100 });
-        }
+        doc
+            .font("Helvetica-Bold")
+            .fontSize(24)
+            .text("sharcly", pageWidth - margin - 100, 30, { align: "right", width: 100 });
         doc
             .fontSize(6)
             .font("Helvetica")

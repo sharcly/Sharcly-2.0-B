@@ -20,6 +20,9 @@ export class ImageService {
   static async processProductMedia(files: any[]): Promise<{ data: Buffer, mimeType: string }[]> {
     return await Promise.all(
       files.map(async (file) => {
+        if (file.mimetype === "image/svg+xml") {
+          return { data: file.buffer, mimeType: "image/svg+xml" };
+        }
         const optimized = await this.optimizeImage(file.buffer);
         return { data: optimized, mimeType: "image/webp" };
       })

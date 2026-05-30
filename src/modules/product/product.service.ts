@@ -26,7 +26,6 @@ export class ProductService {
           category: true,
           type: true,
           tags: true,
-          flavours: true,
           variants: true,
           images: { select: { id: true } }
         },
@@ -50,7 +49,6 @@ export class ProductService {
         category: true,
         type: true,
         tags: true,
-        flavours: true,
         variants: true,
         images: { select: { id: true } },
         reviews: { include: { user: { select: { name: true } } } }
@@ -123,16 +121,6 @@ export class ProductService {
     });
   }
 
-  static async bulkUpdateProducts(productIds: string[], isPublished: boolean) {
-    return await prisma.product.updateMany({
-      where: { id: { in: productIds } },
-      data: { 
-        isPublished,
-        status: isPublished ? "PUBLISHED" : "DRAFT"
-      }
-    });
-  }
-
   static async deleteProduct(id: string) {
     return await prisma.product.delete({ where: { id } });
   }
@@ -166,40 +154,6 @@ export class ProductService {
   }
 
   static async deleteCategory(id: string) {
-    // 1. Check if the category has any products
-    const productsCount = await prisma.product.count({
-      where: { categoryId: id }
-    });
-
-    if (productsCount > 0) {
-      // Find or create a default "Uncategorized" category
-      let defaultCategory = await prisma.category.findFirst({
-        where: { slug: "uncategorized" }
-      });
-
-      if (!defaultCategory) {
-        defaultCategory = await prisma.category.create({
-          data: {
-            name: "Uncategorized",
-            slug: "uncategorized",
-            description: "Default category for migrated products"
-          }
-        });
-      }
-
-      // Prevent deleting the default uncategorized category itself
-      if (defaultCategory.id === id) {
-        throw new Error("Cannot delete the default Uncategorized category");
-      }
-
-      // Reassign products to the default category
-      await prisma.product.updateMany({
-        where: { categoryId: id },
-        data: { categoryId: defaultCategory.id }
-      });
-    }
-
-    // 2. Safely delete the category
     return await prisma.category.delete({ where: { id } });
   }
 
@@ -268,32 +222,5 @@ export class ProductService {
   static async createType(typeData: any) {
     const { name } = typeData;
     return await prisma.productType.create({ data: { name } });
-  }
-
-  static async getFlavours() {
-    return await prisma.flavour.findMany({ 
-      orderBy: { name: "asc" },
-      include: { _count: { select: { products: true } } }
-    });
-  }
-
-  static async createFlavour(flavourData: any) {
-    const { name, slug } = flavourData;
-    const finalSlug = slug || name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
-    return await prisma.flavour.create({
-      data: { name, slug: finalSlug }
-    });
-  }
-
-  static async updateFlavour(id: string, flavourData: any) {
-    const { name, slug } = flavourData;
-    return await prisma.flavour.update({
-      where: { id },
-      data: { name, slug }
-    });
-  }
-
-  static async deleteFlavour(id: string) {
-    return await prisma.flavour.delete({ where: { id } });
   }
 }

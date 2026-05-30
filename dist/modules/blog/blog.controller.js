@@ -26,11 +26,9 @@ class BlogController {
     }
     static async createBlog(req, res) {
         try {
-            const authorId = req.user?.id;
-            if (!authorId)
-                return res.status(401).json({ success: false, message: "Unauthorized" });
-            const file = req.file;
-            const blog = await blog_service_1.BlogService.createBlog(req.body, authorId, file);
+            // @ts-ignore
+            const authorId = req.user.id;
+            const blog = await blog_service_1.BlogService.createBlog(req.body, authorId);
             res.status(201).json({ success: true, blog });
         }
         catch (error) {
@@ -39,8 +37,7 @@ class BlogController {
     }
     static async updateBlog(req, res) {
         try {
-            const file = req.file;
-            const blog = await blog_service_1.BlogService.updateBlog(req.params.id, req.body, file);
+            const blog = await blog_service_1.BlogService.updateBlog(req.params.id, req.body);
             res.json({ success: true, blog });
         }
         catch (error) {

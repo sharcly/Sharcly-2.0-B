@@ -15,190 +15,155 @@ import swaggerOptions from "./common/config/swagger.config";
 
 import apiRoutes from "./routes";
 import { bootstrap } from "./common/utils/bootstrap";
-import imageRouter from "./modules/image/image.router";
-import { BlogWorker } from "./modules/blog/blog.worker";
-// import { track } from "@vercel/analytics/server"; // Replaced with dynamic import below
 
 const app = express();
 const port = process.env.PORT || 5000;
 
-// ✅ Essential for Vercel: Trust the proxy headers
-app.set("trust proxy", 1);
-
-/* ─────────────────────────────────────────────
-   ✅ CORS CONFIGURATION (Dynamic & Robust)
-──────────────────────────────────────────── */
-
-const allowedOrigins = [
-  "http://localhost:3000",
-  "http://localhost:5173",
-  "https://sharcly.io",
-  "https://sharcly.com",
-  "https://www.sharcly.com",
-  "https://www.sharcly.io",
-  "https://sharcly-2-0.vercel.app",
-  process.env.FRONTEND_URL,
-].filter(Boolean) as string[];
-
-const corsOptions: cors.CorsOptions = {
-  origin: (origin, callback) => {
-    // Allow non-browser requests (like mobile apps or curl)
-    if (!origin) return callback(null, true);
-    
-    const normalizedOrigin = origin.replace(/\/$/, "").toLowerCase();
-    
-    // Check against explicit allowed list
-    const isAllowed = allowedOrigins.some(o => o.toLowerCase().replace(/\/$/, "") === normalizedOrigin);
-    
-    // Allow all Vercel subdomains that contain 'sharcly' (previews, branches, etc.)
-    const isVercel = normalizedOrigin.endsWith(".vercel.app") && normalizedOrigin.includes("sharcly");
-
-    if (isAllowed || isVercel) {
-      callback(null, true);
-    } else {
-      console.warn(`[CORS] Blocked origin: ${origin}`);
-      callback(null, false);
-    }
-  },
-  credentials: true,
-  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-  allowedHeaders: [
-    "Content-Type", 
-    "Authorization", 
-    "X-Requested-With", 
-    "Accept", 
-    "X-CSRF-Token", 
-    "X-Api-Version",
-    "sentry-trace",
-    "baggage"
-  ],
-  exposedHeaders: ["set-cookie"],
-  optionsSuccessStatus: 200,
-  maxAge: 86400
-};
-
-// Global CORS Middleware
-app.use(cors(corsOptions));
-
-// Force Vary: Origin header to prevent Vercel CDN caching issues
-app.use((req, res, next) => {
-  res.header("Vary", "Origin");
-  next();
-});
-
-/* ─────────────────────────────────────────────
-   Middlewares
-──────────────────────────────────────────── */
-
-app.use(compression());
-
-app.use(
-  helmet({
-    crossOriginResourcePolicy: false
-  })
-);
-
-app.use(morgan(process.env.NODE_ENV === "production" ? "combined" : "dev"));
-app.use(cookieParser());
-
-// ✅ Stripe Webhook must use raw body
-app.use("/api/payments/webhook", express.raw({ type: "application/json" }));
-
-app.use(express.json({ limit: "10mb" }));
-app.use(express.urlencoded({ extended: true, limit: "10mb" }));
-
-// Vercel Analytics Middleware (Track API Hits)
-app.use(async (req, res, next) => {
-  if (process.env.VERCEL) {
-    try {
-      const { track } = await import("@vercel/analytics/server");
-      track("api_hit", {
-        path: req.path,
-        method: req.method,
-      });
-    } catch (err) {
-      // Ignore analytics errors to prevent app crash
-    }
-  }
-  next();
-});
-
-/* ─────────────────────────────────────────────
-   Rate Limiting
-──────────────────────────────────────────── */
-
-import { csrfProtection } from "./common/middlewares/csrf.middleware";
-
-app.use(
-  "/api",
-  rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 500
-  })
-);
-
-// Global CSRF Protection
-app.use("/api", csrfProtection);
-
-/* ─────────────────────────────────────────────
-   Health Check
-──────────────────────────────────────────── */
-
-app.get("/api/health", (req: Request, res: Response) => {
-  res.json({ status: "ok" });
-});
-
-
-/* ─────────────────────────────────────────────
-   Swagger
-──────────────────────────────────────────── */
-
+// Swagger Documentation
 const swaggerSpec = swaggerJsdoc(swaggerOptions);
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
-/* ─────────────────────────────────────────────
-   Routes
-──────────────────────────────────────────── */
+// ─── Rate Limiting ────────────────────────────────────────────────────────────
+const globalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 500, // general API limit
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: "Too many requests, please try again later." },
+});
 
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 15, // strict limit on login/register
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: "Too many authentication attempts, please try again in 15 minutes." },
+});
+
+// ─── Core Middleware ──────────────────────────────────────────────────────────
+app.use(compression());
+
+app.use(helmet({
+  crossOriginResourcePolicy: false,
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      imgSrc: ["'self'", "data:", "https:", "blob:"],
+      connectSrc: ["'self'", "http://207.2.123.86:8181", "http://207.2.123.86:3000", "https:"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com"],
+      objectSrc: ["'none'"],
+      frameAncestors: ["'none'"],
+    },
+  },
+}));
+
+app.use(cors({
+  origin: [
+    process.env.FRONTEND_URL || "http://localhost:3000",
+    "http://localhost:3000",
+    "http://207.2.123.86:3000"
+  ],
+  credentials: true, // Required for httpOnly cookies
+}));
+
+// Use 'combined' in production for structured logs, 'dev' for local
+app.use(morgan(process.env.NODE_ENV === "production" ? "combined" : "dev"));
+
+// Parse cookies (needed for httpOnly token cookies)
+app.use(cookieParser());
+
+// Body parsing with size limits to prevent DoS
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+
+// Apply global rate limit
+app.use("/api", globalLimiter);
+
+// Apply strict rate limit on auth endpoints
+app.use("/api/auth/login", authLimiter);
+app.use("/api/auth/register", authLimiter);
+app.use("/api/auth/refresh-token", authLimiter);
+app.use("/api/auth/verify-email", authLimiter);
+
+// Search rate limit — prevent DoS via repeated expensive queries
+const searchLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: "Too many search requests, please slow down." },
+});
+app.use("/api/search", searchLimiter);
+
+// ─── Routes ──────────────────────────────────────────────────────────────────
 app.use("/api", apiRoutes);
+
+import imageRouter from "./modules/image/image.router";
 app.use("/images", imageRouter);
 
-/* ─────────────────────────────────────────────
-   Error Handler
-──────────────────────────────────────────── */
-
+// ─── Global Error Handler ─────────────────────────────────────────────────────
 app.use((err: any, req: Request, res: Response, next: any) => {
-  console.error("[ERROR]", err);
+  // Log full error internally
+  console.error("[ERROR]", err.stack);
 
+  // Never expose internal error details in production
+  const isProduction = process.env.NODE_ENV === "production";
   res.status(err.status || 500).json({
     success: false,
-    message:
-      process.env.NODE_ENV === "production"
-        ? "Internal Server Error"
-        : err.message
+    message: isProduction ? "An internal error occurred" : (err.message || "Internal Server Error"),
   });
 });
 
-/* ─────────────────────────────────────────────
-   Server Start (ONLY local / non-vercel)
-──────────────────────────────────────────── */
+import { BlogWorker } from "./modules/blog/blog.worker";
 
+// ─── Server Start ─────────────────────────────────────────────────────────────
 async function startServer() {
   try {
     await bootstrap();
     BlogWorker.init();
 
-    app.listen(port, () => {
-      console.log(`⚡ Server running on http://localhost:${port}`);
+    const server = app.listen(port, () => {
+      console.log(`⚡️[server]: Server is running at http://localhost:${port}`);
     });
+
+    server.on("error", (err: any) => {
+      if (err.code === "EADDRINUSE") {
+        console.error(`❌ Port ${port} is already in use.`);
+        process.exit(1);
+      } else {
+        console.error("❌ Server error:", err);
+      }
+    });
+
+    const gracefullyShutdown = async (signal: string) => {
+      console.log(`\nStopping server due to ${signal}...`);
+      server.close(async () => {
+        console.log("HTTP server closed.");
+        try {
+          await prisma.$disconnect();
+          console.log("Database connection closed.");
+          process.exit(0);
+        } catch (err) {
+          console.error("Error during shutdown:", err);
+          process.exit(1);
+        }
+      });
+
+      setTimeout(() => {
+        console.error("Could not close connections in time, forcefully shutting down");
+        process.exit(1);
+      }, 10000);
+    };
+
+    process.on("SIGINT", () => gracefullyShutdown("SIGINT"));
+    process.on("SIGTERM", () => gracefullyShutdown("SIGTERM"));
+
   } catch (error) {
     console.error("❌ Failed to start server:", error);
     process.exit(1);
   }
 }
 
-if (!process.env.VERCEL) {
-  startServer();
-}
-
-export default app;
+startServer();

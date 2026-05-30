@@ -20,16 +20,6 @@ export const createOrder = async (req: any, res: Response) => {
   }
 };
 
-export const previewOrder = async (req: any, res: Response) => {
-  try {
-    const email = req.user?.email || req.body.email;
-    const summary = await OrderService.previewOrder(req.body, email);
-    res.status(200).json({ success: true, summary });
-  } catch (error: any) {
-    res.status(400).json({ message: error.message || "Calculation failed" });
-  }
-};
-
 export const getMyOrders = async (req: any, res: Response) => {
   try {
     const orders = await OrderService.getMyOrders(req.user.id);
@@ -44,12 +34,9 @@ export const getAllOrders = async (req: Request, res: Response) => {
   try {
     const orders = await OrderService.getAllOrders();
     res.status(200).json({ success: true, orders });
-  } catch (error: any) {
+  } catch (error) {
     console.error("Fetch all orders error:", error);
-    res.status(500).json({ 
-      message: "Failed to fetch all orders",
-      error: error.message 
-    });
+    res.status(500).json({ message: "Failed to fetch all orders" });
   }
 };
 
@@ -62,12 +49,9 @@ export const getOrderById = async (req: any, res: Response) => {
       return res.status(404).json({ message: "Order not found" });
     }
 
-    // IDOR fix: only allow owner or someone with orders.view permission to view order
-    const hasOrderViewPerm = req.user?.userRole?.slug === "admin" || 
-                             req.user?.userRole?.slug === "super_admin" || 
-                             req.user?.userRole?.permissions?.some((p: any) => p.permission.slug === "orders.view");
-                             
-    if (!hasOrderViewPerm && order.userId !== req.user?.id) {
+    // IDOR fix: only allow owner or admin/manager to view order
+    const isAdmin = ["admin", "manager"].includes(req.user?.userRole?.slug);
+    if (!isAdmin && order.userId !== req.user?.id) {
       return res.status(403).json({ message: "Access denied" });
     }
 
@@ -98,12 +82,9 @@ export const downloadInvoice = async (req: any, res: Response) => {
       return res.status(404).json({ message: "Order not found" });
     }
 
-    // IDOR fix: only allow owner or someone with orders.view permission to view order
-    const hasOrderViewPerm = req.user?.userRole?.slug === "admin" || 
-                             req.user?.userRole?.slug === "super_admin" || 
-                             req.user?.userRole?.permissions?.some((p: any) => p.permission.slug === "orders.view");
-
-    if (!hasOrderViewPerm && order.userId !== req.user?.id) {
+    // IDOR fix: only allow owner or admin/manager to view order
+    const isAdmin = ["admin", "manager"].includes(req.user?.userRole?.slug);
+    if (!isAdmin && order.userId !== req.user?.id) {
       return res.status(403).json({ message: "Access denied" });
     }
 
@@ -117,7 +98,7 @@ export const downloadInvoice = async (req: any, res: Response) => {
   }
 };
 
-export const cancelOrder = async (req: any, res: Response) => {
+export const cancelOrder = async (req: any, res: any) => {
   try {
     const { id } = req.params;
     const { reason } = req.body;
@@ -130,5 +111,15 @@ export const cancelOrder = async (req: any, res: Response) => {
     res.status(200).json({ success: true, order });
   } catch (error: any) {
     res.status(400).json({ message: error.message || "Failed to cancel order" });
+  }
+};
+
+export const cancelFailedPayment = async (req: any, res: any) => {
+  try {
+    const { id } = req.params;
+    await OrderService.handleFailedPaymentCleanup(id);
+    res.status(200).json({ success: true, message: "Failed payment order cleaned up successfully" });
+  } catch (error: any) {
+    res.status(400).json({ message: error.message || "Failed to cleanup order" });
   }
 };

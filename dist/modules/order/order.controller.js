@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.cancelOrder = exports.downloadInvoice = exports.updateOrderStatus = exports.getOrderById = exports.getAllOrders = exports.getMyOrders = exports.previewOrder = exports.createOrder = void 0;
+exports.cancelFailedPayment = exports.cancelOrder = exports.downloadInvoice = exports.updateOrderStatus = exports.getOrderById = exports.getAllOrders = exports.getMyOrders = exports.createOrder = void 0;
 const order_service_1 = require("./order.service");
 const invoice_service_1 = require("./invoice.service");
 const createOrder = async (req, res) => {
@@ -20,16 +20,6 @@ const createOrder = async (req, res) => {
     }
 };
 exports.createOrder = createOrder;
-const previewOrder = async (req, res) => {
-    try {
-        const summary = await order_service_1.OrderService.previewOrder(req.body);
-        res.status(200).json({ success: true, summary });
-    }
-    catch (error) {
-        res.status(400).json({ message: error.message || "Calculation failed" });
-    }
-};
-exports.previewOrder = previewOrder;
 const getMyOrders = async (req, res) => {
     try {
         const orders = await order_service_1.OrderService.getMyOrders(req.user.id);
@@ -48,10 +38,7 @@ const getAllOrders = async (req, res) => {
     }
     catch (error) {
         console.error("Fetch all orders error:", error);
-        res.status(500).json({
-            message: "Failed to fetch all orders",
-            error: error.message
-        });
+        res.status(500).json({ message: "Failed to fetch all orders" });
     }
 };
 exports.getAllOrders = getAllOrders;
@@ -63,7 +50,7 @@ const getOrderById = async (req, res) => {
             return res.status(404).json({ message: "Order not found" });
         }
         // IDOR fix: only allow owner or admin/manager to view order
-        const isAdmin = ["admin", "super_admin", "manager"].includes(req.user?.userRole?.slug);
+        const isAdmin = ["admin", "manager"].includes(req.user?.userRole?.slug);
         if (!isAdmin && order.userId !== req.user?.id) {
             return res.status(403).json({ message: "Access denied" });
         }
@@ -95,7 +82,7 @@ const downloadInvoice = async (req, res) => {
             return res.status(404).json({ message: "Order not found" });
         }
         // IDOR fix: only allow owner or admin/manager to view order
-        const isAdmin = ["admin", "super_admin", "manager"].includes(req.user?.userRole?.slug);
+        const isAdmin = ["admin", "manager"].includes(req.user?.userRole?.slug);
         if (!isAdmin && order.userId !== req.user?.id) {
             return res.status(403).json({ message: "Access denied" });
         }
@@ -124,3 +111,14 @@ const cancelOrder = async (req, res) => {
     }
 };
 exports.cancelOrder = cancelOrder;
+const cancelFailedPayment = async (req, res) => {
+    try {
+        const { id } = req.params;
+        await order_service_1.OrderService.handleFailedPaymentCleanup(id);
+        res.status(200).json({ success: true, message: "Failed payment order cleaned up successfully" });
+    }
+    catch (error) {
+        res.status(400).json({ message: error.message || "Failed to cleanup order" });
+    }
+};
+exports.cancelFailedPayment = cancelFailedPayment;

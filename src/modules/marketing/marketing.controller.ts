@@ -1,6 +1,5 @@
 import { Request, Response } from "express";
 import { MarketingService } from "./marketing.service";
-import { SeoService } from "../seo/seo.service";
 
 export class MarketingController {
   static async getActiveOffers(req: Request, res: Response) {
@@ -23,16 +22,7 @@ export class MarketingController {
 
   static async createOffer(req: Request, res: Response) {
     try {
-      const data = { ...req.body };
-      
-      // Handle file upload
-      const files = req.files as Express.Multer.File[];
-      const imageFile = files?.find(f => f.fieldname === "image");
-      if (imageFile) {
-        data.image = imageFile.filename;
-      }
-
-      const offer = await MarketingService.createOffer(data);
+      const offer = await MarketingService.createOffer(req.body);
       res.status(201).json(offer);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -41,16 +31,7 @@ export class MarketingController {
 
   static async updateOffer(req: Request, res: Response) {
     try {
-      const data = { ...req.body };
-
-      // Handle file upload
-      const files = req.files as Express.Multer.File[];
-      const imageFile = files?.find(f => f.fieldname === "image");
-      if (imageFile) {
-        data.image = imageFile.filename;
-      }
-
-      const offer = await MarketingService.updateOffer(req.params.id as string, data);
+      const offer = await MarketingService.updateOffer(req.params.id, req.body);
       res.json(offer);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -59,7 +40,7 @@ export class MarketingController {
 
   static async deleteOffer(req: Request, res: Response) {
     try {
-      await MarketingService.deleteOffer(req.params.id as string);
+      await MarketingService.deleteOffer(req.params.id);
       res.json({ message: "Offer deleted successfully" });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -83,46 +64,6 @@ export class MarketingController {
     try {
       const claims = await MarketingService.getClaims();
       res.json(claims);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
-    }
-  }
-
-  static async subscribeNewsletter(req: Request, res: Response) {
-    try {
-      const { email } = req.body;
-      if (!email) {
-        return res.status(400).json({ message: "Email is required" });
-      }
-      const result = await MarketingService.subscribeNewsletter(email);
-      res.json({ 
-        message: "Thank you for joining our community!",
-        ...result 
-      });
-    } catch (error: any) {
-      res.status(400).json({ message: error.message });
-    }
-  }
-
-  static async getSubscribers(req: Request, res: Response) {
-    try {
-      const subscribers = await MarketingService.getSubscribers();
-      res.json(subscribers);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
-    }
-  }
-  static async getKlaviyoStatus(req: Request, res: Response) {
-    try {
-      const seoSettings = await SeoService.getGlobalSettings();
-      const hasKey = !!seoSettings?.klaviyoPrivateKey;
-      const hasList = !!seoSettings?.klaviyoPublicKey;
-      
-      res.json({
-        active: hasKey && hasList,
-        hasKey,
-        hasList
-      });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

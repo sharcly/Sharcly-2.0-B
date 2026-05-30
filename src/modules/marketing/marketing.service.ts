@@ -1,8 +1,6 @@
 import { prisma } from "../../common/lib/prisma";
 import { sendWelcomeCoupon } from "../auth/email.service";
 import crypto from "crypto";
-import { KlaviyoService } from "./klaviyo.service";
-import { SeoService } from "../seo/seo.service";
 
 export class MarketingService {
   static async getActiveOffers() {
@@ -22,15 +20,8 @@ export class MarketingService {
     return await prisma.welcomeOffer.create({
       data: {
         title: data.title,
-        subtitle: data.subtitle,
         description: data.description,
         discount: data.discount,
-        discountType: data.discountType || "FIXED",
-        image: data.image,
-        options: data.options,
-        step2Title: data.step2Title,
-        step2Text: data.step2Text,
-        footerText: data.footerText,
         isActive: data.isActive !== undefined ? data.isActive : true
       }
     });
@@ -44,10 +35,6 @@ export class MarketingService {
   }
 
   static async deleteOffer(id: string) {
-    // Delete all claims associated with this welcome offer first to satisfy the FK constraint
-    await prisma.offerClaim.deleteMany({
-      where: { welcomeOfferId: id }
-    });
     return await prisma.welcomeOffer.delete({ where: { id } });
   }
 
@@ -81,7 +68,7 @@ export class MarketingService {
       data: {
         code: couponCode,
         discount: offer.discount,
-        discountType: offer.discountType as any,
+        discountType: "PERCENTAGE",
         expiryDate,
         usageLimit: 1
       }
@@ -99,28 +86,9 @@ export class MarketingService {
 
     // 6. Send email
     try {
-      await sendWelcomeCoupon(email, couponCode, offer.discount.toString(), offer.discountType);
+      await sendWelcomeCoupon(email, couponCode, offer.discount.toString());
     } catch (error) {
       console.error("Failed to send welcome coupon email:", error);
-    }
-    
-    // 7. Klaviyo Sync & Event Tracking
-    try {
-      const seoSettings = await SeoService.getGlobalSettings();
-      KlaviyoService.init(seoSettings?.klaviyoPrivateKey || undefined);
-      
-      // Sync Profile
-      await KlaviyoService.syncProfile({ email, phone });
-      
-      // Track Event
-      await KlaviyoService.trackEvent(email, "Claimed Welcome Offer", {
-        "OfferTitle": offer.title,
-        "CouponCode": couponCode,
-        "Discount": offer.discount,
-        "DiscountType": offer.discountType
-      });
-    } catch (kErr) {
-      console.warn("Klaviyo Offer Claim Tracking Failed:", kErr);
     }
 
     return claim;
@@ -129,54 +97,6 @@ export class MarketingService {
   static async getClaims() {
     return await prisma.offerClaim.findMany({
       include: { welcomeOffer: true },
-      orderBy: { createdAt: "desc" }
-    });
-  }
-
-  static async subscribeNewsletter(email: string) {
-    // 1. Check if already subscribed in local DB
-    const existingSubscriber = await prisma.newsletterSubscriber.findUnique({
-      where: { email }
-    });
-
-    if (existingSubscriber) {
-      if (existingSubscriber.isActive) {
-        throw new Error("You are already subscribed to our newsletter.");
-      } else {
-        // Reactivate
-        await prisma.newsletterSubscriber.update({
-          where: { email },
-          data: { isActive: true }
-        });
-      }
-    } else {
-      // Create new subscriber
-      await prisma.newsletterSubscriber.create({
-        data: { email }
-      });
-    }
-
-    // 2. Klaviyo Sync
-    try {
-      const seoSettings = await SeoService.getGlobalSettings();
-      KlaviyoService.init(seoSettings?.klaviyoPrivateKey || undefined);
-      
-      // Add to list
-      await KlaviyoService.subscribeToList(email, seoSettings?.klaviyoPublicKey || undefined);
-      
-      // Track event
-      await KlaviyoService.trackEvent(email, "Subscribed to Newsletter", {
-        "Source": "Footer Community Form"
-      });
-    } catch (kErr) {
-      console.warn("Klaviyo Newsletter Sync Failed:", kErr);
-    }
-
-    return { email, success: true };
-  }
-
-  static async getSubscribers() {
-    return await prisma.newsletterSubscriber.findMany({
       orderBy: { createdAt: "desc" }
     });
   }

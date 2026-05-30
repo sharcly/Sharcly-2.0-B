@@ -6,14 +6,33 @@ import { SeoService } from "../seo/seo.service";
 import { PaymentService } from "../payment/payment.service";
 
 import crypto from "crypto";
-import bcrypt from "bcryptjs";
 
 export class OrderService {
-  static async calculateOrderTotals(orderData: any) {
-    const { items, couponCode } = orderData;
-    
-    let subtotal = 0;
-    const itemsWithPrice = [];
+  static async createOrder(userId: string | undefined, email: string, orderData: any) {
+    const { items, shippingAddress, billingAddress, couponCode, paymentMethod } = orderData;
+
+    // Secure user identification
+    let finalUserId = userId;
+    if (!finalUserId) {
+      let guestUser = await prisma.user.findUnique({ where: { email } });
+      if (!guestUser) {
+        // Explicitly assign 'user' role to guest accounts
+        const userRole = await prisma.role.findUnique({ where: { slug: "user" } });
+        guestUser = await prisma.user.create({
+          data: {
+             email,
+             password: `guest_${crypto.randomBytes(16).toString("hex")}`,
+             name: "Guest Shopper",
+             ...(userRole ? { roleId: userRole.id } : {})
+          }
+        });
+      }
+      finalUserId = guestUser.id;
+    }
+
+    // Calculate total and validate stock
+    let totalAmount = 0;
+    const orderItems: { productId: string; variantId?: string; quantity: number; price: number }[] = [];
 
     for (const item of items) {
       let product = await prisma.product.findUnique({ where: { id: item.productId } });
@@ -27,131 +46,69 @@ export class OrderService {
         if (variant) {
            product = variant.product;
         } else {
-           throw new Error("One or more items in your cart are unavailable.");
+           // Don't expose internal product IDs in error messages
+           throw new Error("One or more items in your cart are unavailable. Please refresh and try again.");
         }
       }
 
+      const targetStock = variant ? variant.inventoryQuantity : product.stock;
+      if (targetStock < item.quantity) {
+        throw new Error(`Insufficient stock for ${product.name}`);
+      }
+
       const price = variant ? Number(variant.price) : Number(product.price);
-      subtotal += price * item.quantity;
-      itemsWithPrice.push({
-        ...item,
+      totalAmount += price * item.quantity;
+      orderItems.push({
         productId: product.id,
         variantId: variant ? variant.id : undefined,
-        price,
-        name: product.name,
-        image: product.ogImage
+        quantity: item.quantity,
+        price: price
       });
     }
 
-    // Coupon Calculation
+    // Validate coupon code BEFORE transaction (read-only check)
     let couponId: string | undefined = undefined;
-    let discountAmount = 0;
-    let couponDetails = null;
-
+    let couponDiscountAmount = 0;
     if (couponCode) {
       const coupon = await prisma.coupon.findUnique({ where: { code: couponCode as string } });
       if (coupon && coupon.expiryDate > new Date() && coupon.usedCount < coupon.usageLimit) {
         if (coupon.discountType === "PERCENTAGE") {
-          discountAmount = (subtotal * Number(coupon.discount)) / 100;
+          couponDiscountAmount = (totalAmount * Number(coupon.discount)) / 100;
         } else {
-          discountAmount = Number(coupon.discount);
+          couponDiscountAmount = Number(coupon.discount);
         }
         couponId = coupon.id;
-        couponDetails = coupon;
-      } else if (couponCode) {
-         throw new Error("Coupon is invalid, expired, or has reached its usage limit.");
       }
     }
+    // Apply coupon discount to total
+    totalAmount = Math.max(0, totalAmount - couponDiscountAmount);
 
-    const discountedSubtotal = Math.max(0, subtotal - discountAmount);
-
-    // Tax and Shipping
+    // Add Tax and Shipping from settings
     const settings = await prisma.storeSettings.findFirst();
     let taxAmount = 0;
     let shippingCost = 0;
 
     if (settings) {
       const taxRate = Number(settings.taxRate) || 0;
-      taxAmount = (discountedSubtotal * taxRate) / 100;
+      taxAmount = (totalAmount * taxRate) / 100;
       
       const shippingCharge = Number(settings.shippingCharge) || 0;
       const freeShippingThreshold = Number(settings.freeShippingThreshold) || 0;
-      shippingCost = (freeShippingThreshold > 0 && discountedSubtotal >= freeShippingThreshold) ? 0 : shippingCharge;
+      shippingCost = (freeShippingThreshold > 0 && totalAmount >= freeShippingThreshold) ? 0 : shippingCharge;
     }
 
-    const totalAmount = discountedSubtotal + taxAmount + shippingCost;
+    totalAmount += taxAmount + shippingCost;
 
-    return {
-      subtotal,
-      discountAmount,
-      taxAmount,
-      shippingAmount: shippingCost,
-      totalAmount,
-      couponId,
-      couponDetails,
-      items: itemsWithPrice
-    };
-  }
-
-  static async createOrder(userId: string | undefined, email: string, orderData: any) {
-    const { shippingAddress, billingAddress, paymentMethod, gatewayId } = orderData;
-
-    // 1. Check for Restricted States
-    const settings = await prisma.storeSettings.findFirst();
-    if (settings && settings.restrictedStates && settings.restrictedStates.length > 0) {
-       const userState = orderData.shippingState?.trim();
-       if (userState && settings.restrictedStates.some(state => userState.toLowerCase().includes(state.toLowerCase()))) {
-          throw new Error(`Sorry, we currently do not ship to ${userState} due to local regulations.`);
-       }
-    }
-
-    // 2. Calculate Totals (Backend Source of Truth)
-    const totals = await this.calculateOrderTotals(orderData);
-
-    // 3. Secure user identification
-    let finalUserId = userId;
-    if (!finalUserId) {
-      let guestUser = await prisma.user.findUnique({ where: { email } });
-      if (!guestUser) {
-        const userRole = await prisma.role.findUnique({ where: { slug: "user" } });
-        const isCreatingAccount = !!orderData.password;
-        const displayName = orderData.name || (shippingAddress?.split(',')[0] || "Guest Shopper");
-        const passwordToUse = isCreatingAccount 
-          ? await bcrypt.hash(orderData.password, 10)
-          : `guest_${crypto.randomBytes(16).toString("hex")}`;
-
-        guestUser = await prisma.user.create({
-          data: {
-             email,
-             password: passwordToUse,
-             name: displayName,
-             ...(userRole ? { roleId: userRole.id } : {})
-          }
-        });
-      }
-      finalUserId = guestUser.id;
-    }
-
-    // 3. Stock Validation
-    for (const item of totals.items) {
-      const product = await prisma.product.findUnique({ where: { id: item.productId } });
-      const variant = item.variantId ? await prisma.productVariant.findUnique({ where: { id: item.variantId } }) : null;
-      const targetStock = Math.max(variant?.inventoryQuantity || 0, product?.stock || 0);
-      
-      if (targetStock < item.quantity) {
-        throw new Error(`Insufficient stock for ${item.name}`);
-      }
-    }
-
-    // 4. Create order, update stock, and increment coupon usage in transaction
-    const order = await prisma.$transaction(async (tx: any) => {
-      if (totals.couponId) {
-        const coupon = await tx.coupon.findUnique({ where: { id: totals.couponId } });
+    // Create order, update stock, and increment coupon usage all in ONE atomic transaction
+    const order = await prisma.$transaction(async (tx) => {
+      // If coupon is used, re-validate inside transaction to prevent race conditions
+      if (couponId) {
+        const coupon = await tx.coupon.findUnique({ where: { id: couponId } });
         if (!coupon || coupon.usedCount >= coupon.usageLimit || coupon.expiryDate <= new Date()) {
-          throw new Error("Coupon is no longer valid.");
+          throw new Error("Coupon is no longer valid or has reached its usage limit");
         }
         await tx.coupon.update({
-          where: { id: totals.couponId },
+          where: { id: couponId },
           data: { usedCount: { increment: 1 } }
         });
       }
@@ -159,46 +116,34 @@ export class OrderService {
       const newOrder = await tx.order.create({
         data: {
           userId: finalUserId as string,
-          totalAmount: totals.totalAmount,
-          taxAmount: totals.taxAmount,
-          shippingAmount: totals.shippingAmount,
+          totalAmount,
+          taxAmount,
+          shippingAmount: shippingCost,
           address: shippingAddress,
           shippingAddress,
           billingAddress: billingAddress || shippingAddress,
           paymentMethod,
           status: OrderStatus.PENDING,
-          couponId: totals.couponId,
+          couponId,
           items: {
-            create: totals.items.map(oi => ({
+            create: orderItems.map(oi => ({
                productId: oi.productId,
                quantity: oi.quantity,
                price: oi.price
             }))
-          },
-          statusHistory: {
-            create: {
-              status: OrderStatus.PENDING
-            }
           }
         },
-        include: { items: true, statusHistory: true }
+        include: { items: true }
       });
 
-      // Update stock
-      for (const item of totals.items) {
-        let decrementedVariant = false;
+      // Update stock atomically
+      for (const item of orderItems) {
         if (item.variantId) {
-          const variant = await tx.productVariant.findUnique({ where: { id: item.variantId } });
-          if (variant && variant.inventoryQuantity > 0) {
-            await tx.productVariant.update({
-              where: { id: item.variantId },
-              data: { inventoryQuantity: { decrement: item.quantity } }
-            });
-            decrementedVariant = true;
-          }
-        }
-        
-        if (!decrementedVariant) {
+          await tx.productVariant.update({
+            where: { id: item.variantId },
+            data: { inventoryQuantity: { decrement: item.quantity } }
+          });
+        } else {
           await tx.product.update({
             where: { id: item.productId },
             data: { stock: { decrement: item.quantity } }
@@ -209,53 +154,46 @@ export class OrderService {
       return newOrder;
     });
 
+    // Klaviyo Tracking
+    try {
+      const seoSettings = await SeoService.getGlobalSettings();
+      if (seoSettings?.klaviyoPrivateKey) {
+        KlaviyoService.init(seoSettings.klaviyoPrivateKey);
+        await KlaviyoService.trackEvent(email, "Placed Order", {
+          "$value": Number(order.totalAmount),
+          "OrderID": order.id,
+          "ItemNames": order.items.map((i: any) => i.productId), // ideally fetch names
+          "ShippingAddress": order.shippingAddress,
+          "BillingAddress": order.billingAddress,
+        });
+      }
+    } catch (kErr) {
+      console.warn("Klaviyo Order Tracking Failed:", kErr);
+    }
+
     // 5. Handle Stripe Payment Intent if online
     let clientSecret: string | undefined = undefined;
     if (paymentMethod === 'online') {
       try {
         const paymentIntent = await PaymentService.createPaymentIntent(
-          totals.totalAmount,
+          Number(order.totalAmount),
           "usd",
-          { orderId: order.id, userId: finalUserId },
-          gatewayId
+          { orderId: order.id, userId: finalUserId }
         );
         clientSecret = paymentIntent.client_secret || undefined;
       } catch (pErr: any) {
         console.error("Stripe Payment Intent Creation Failed:", pErr);
-        // Throwing error here is critical so the user doesn't think the order was successful when payment failed to initiate
         throw new Error(`Failed to initialize payment: ${pErr.message || "Stripe error"}`);
       }
     }
 
-    // Klaviyo Tracking
-    try {
-      const seoSettings = await SeoService.getGlobalSettings();
-      KlaviyoService.init(seoSettings?.klaviyoPrivateKey || undefined);
-      await KlaviyoService.trackEvent(email, "Placed Order", {
-        "$value": Number(order.totalAmount),
-        "OrderID": order.id,
-        "ItemNames": totals.items.map((i: any) => i.name),
-        "Items": totals.items.map((i: any) => ({
-             ProductID: i.productId,
-             SKU: i.variantId || i.productId,
-             ProductName: i.name,
-             Quantity: i.quantity,
-             ItemPrice: i.price,
-             RowTotal: i.price * i.quantity,
-             ImageURL: i.image
-        })),
-        "ShippingAddress": order.shippingAddress,
-        "BillingAddress": order.billingAddress,
-      });
-    } catch (kErr) {
-      console.warn("Klaviyo Order Tracking Failed:", kErr);
-    }
-
-    // Send Email Confirmation
-    try {
-      await sendOrderConfirmation(email, order);
-    } catch (eErr) {
-      console.warn("Email Confirmation Failed:", eErr);
+    // Send Email Confirmation only for non-online (e.g. cod) orders since online orders are still pending payment
+    if (paymentMethod !== 'online') {
+      try {
+        await sendOrderConfirmation(email, order);
+      } catch (eErr) {
+        console.warn("Email Confirmation Failed:", eErr);
+      }
     }
 
     return { order, clientSecret };
@@ -264,30 +202,25 @@ export class OrderService {
   static async getMyOrders(userId: string) {
     const orders = await prisma.order.findMany({
       where: { userId },
-      include: { 
-        items: { include: { product: true } },
-        statusHistory: { orderBy: { createdAt: 'desc' } }
-      },
+      include: { items: { include: { product: true } } },
       orderBy: { createdAt: "desc" }
     });
 
     const settings = await prisma.storeSettings.findFirst();
-    return orders.map((order: any) => this.applyLegacyFallback(order, settings));
+    return orders.map(order => this.applyLegacyFallback(order, settings));
   }
 
   static async getAllOrders() {
     const orders = await prisma.order.findMany({
       include: { 
         user: { select: { name: true, email: true } }, 
-        items: { include: { product: true } },
-        statusHistory: { orderBy: { createdAt: 'desc' } }
+        items: { include: { product: true } } 
       },
-      orderBy: { createdAt: "desc" },
-      take: 500 // Limit to prevent timeouts on massive datasets
+      orderBy: { createdAt: "desc" }
     });
 
     const settings = await prisma.storeSettings.findFirst();
-    return orders.map((order: any) => this.applyLegacyFallback(order, settings));
+    return orders.map(order => this.applyLegacyFallback(order, settings));
   }
 
   static async getOrderById(id: string) {
@@ -296,8 +229,7 @@ export class OrderService {
       include: { 
         user: { select: { name: true, email: true } }, 
         items: { include: { product: true } },
-        coupon: true,
-        statusHistory: { orderBy: { createdAt: 'asc' } }
+        coupon: true
       }
     });
 
@@ -306,47 +238,11 @@ export class OrderService {
     return this.applyLegacyFallback(order, settings);
   }
 
-  static async previewOrder(orderData: any, email?: string) {
-    const summary = await this.calculateOrderTotals(orderData);
-    
-    // Klaviyo Abandoned Cart Tracking ("Started Checkout")
-    if (email) {
-      try {
-        const seoSettings = await SeoService.getGlobalSettings();
-        KlaviyoService.init(seoSettings?.klaviyoPrivateKey || undefined);
-        await KlaviyoService.trackEvent(email, "Started Checkout", {
-          "$value": summary.totalAmount,
-          "ItemNames": summary.items.map((i: any) => i.name),
-          "Items": summary.items.map((i: any) => ({
-             ProductID: i.productId,
-             SKU: i.variantId || i.productId,
-             ProductName: i.name,
-             Quantity: i.quantity,
-             ItemPrice: i.price,
-             RowTotal: i.price * i.quantity,
-             ImageURL: i.image
-          }))
-        });
-      } catch (kErr) {
-        console.warn("Klaviyo Started Checkout Tracking Failed:", kErr);
-      }
-    }
-
-    return summary;
-  }
-
   private static applyLegacyFallback(order: any, settings: any) {
     if (!order) return order;
 
-    // Defensive check: ensure items is an array
-    const items = order.items || [];
-    const itemsSubtotal = items.reduce((acc: number, item: any) => {
-      const price = Number(item.price) || 0;
-      const quantity = Number(item.quantity) || 0;
-      return acc + (price * quantity);
-    }, 0);
-
-    const total = Number(order.totalAmount) || 0;
+    const itemsSubtotal = order.items.reduce((acc: number, item: any) => acc + (Number(item.price) * item.quantity), 0);
+    const total = Number(order.totalAmount);
     const recordedTax = Number(order.taxAmount || 0);
     const recordedShipping = Number(order.shippingAmount || 0);
 
@@ -368,20 +264,10 @@ export class OrderService {
   static async updateOrderStatus(id: string, updateData: any) {
     const { status, trackingNumber, carrier, estimatedDelivery, notes } = updateData;
 
-    // Record history
-    if (status) {
-      await prisma.orderStatusHistory.create({
-        data: {
-          orderId: id,
-          status: status as OrderStatus
-        }
-      });
-    }
-
     const updatedOrder = await prisma.order.update({
       where: { id },
       data: { 
-        status: status ? (status as OrderStatus) : undefined,
+        status: status as OrderStatus,
         trackingNumber: trackingNumber || undefined,
         carrier: carrier || undefined,
         estimatedDelivery: estimatedDelivery ? new Date(estimatedDelivery) : undefined,
@@ -389,8 +275,7 @@ export class OrderService {
       },
       include: { 
         user: { select: { email: true, name: true } },
-        items: { include: { product: true } },
-        statusHistory: { orderBy: { createdAt: 'asc' } }
+        items: { include: { product: true } }
       }
     });
 
@@ -450,9 +335,6 @@ export class OrderService {
           await PaymentService.refundOrder(id);
         } catch (rErr: any) {
           console.error(`[CANCEL_ORDER] Refund failed for order ${id}:`, rErr.message);
-          // We might want to still allow cancellation even if refund fails, 
-          // but usually it's better to fail the request so the admin knows something went wrong.
-          // For now, let's throw to ensure the transaction rolls back or at least the error is visible.
           throw rErr; 
         }
       }
@@ -470,5 +352,67 @@ export class OrderService {
 
       return updatedOrder;
     });
+  }
+
+  static async handleFailedPaymentCleanup(orderId: string) {
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
+      include: { items: true, user: { select: { email: true } } }
+    });
+
+    if (!order) return;
+
+    // Only cleanup if the order is still PENDING and was placed online
+    if (order.status !== OrderStatus.PENDING || order.paymentMethod !== 'online') {
+      return;
+    }
+
+    const updatedOrder = await prisma.$transaction(async (tx: any) => {
+      // 1. Revert coupon usage if coupon was applied
+      if (order.couponId) {
+        await tx.coupon.update({
+          where: { id: order.couponId },
+          data: { usedCount: { decrement: 1 } }
+        });
+      }
+
+      // 2. Revert inventory stock
+      for (const item of order.items) {
+        if (item.productId) {
+          await tx.product.update({
+            where: { id: item.productId },
+            data: { stock: { increment: item.quantity } }
+          });
+        }
+      }
+
+      // 3. Add to OrderStatusHistory
+      await tx.orderStatusHistory.create({
+        data: {
+          orderId,
+          status: OrderStatus.CANCELLED
+        }
+      });
+
+      // 4. Update the order status to CANCELLED and set reason
+      return await tx.order.update({
+        where: { id: orderId },
+        data: {
+          status: OrderStatus.CANCELLED,
+          cancelReason: "payment_failed"
+        }
+      });
+    });
+
+    // 5. Send Payment Failed email to the customer with branding!
+    try {
+      const email = order.user?.email || (order as any).email;
+      if (email) {
+        const { sendPaymentFailedEmail } = require("../auth/email.service");
+        await sendPaymentFailedEmail(email, updatedOrder);
+      }
+    } catch (emailErr) {
+      console.warn("Payment Failed Email failed to send:", emailErr);
+    }
   }
 }

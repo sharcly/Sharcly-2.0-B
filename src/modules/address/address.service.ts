@@ -30,39 +30,6 @@ export class AddressService {
     });
   }
 
-  static async update(id: string, userId: string, data: any) {
-    if (data.isDefault) {
-      await prisma.address.updateMany({
-        where: { userId },
-        data: { isDefault: false }
-      });
-    }
-
-    return await prisma.address.update({
-      where: { id, userId },
-      data: {
-        street: data.street,
-        city: data.city,
-        state: data.state,
-        zipCode: data.zipCode,
-        country: data.country,
-        isDefault: data.isDefault
-      }
-    });
-  }
-
-  static async toggleDefault(id: string, userId: string) {
-    await prisma.address.updateMany({
-      where: { userId },
-      data: { isDefault: false }
-    });
-
-    return await prisma.address.update({
-      where: { id, userId },
-      data: { isDefault: true }
-    });
-  }
-
   static async delete(id: string, userId: string) {
     return await prisma.address.delete({
       where: { id, userId }

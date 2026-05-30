@@ -1,31 +1,30 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.deactivateAccount = exports.resetPassword = exports.forgotPassword = exports.changePassword = exports.getMe = exports.getProfile = exports.logout = exports.refreshTokens = exports.login = exports.verifyEmail = exports.sendOtp = exports.register = void 0;
+exports.changePassword = exports.getMe = exports.getProfile = exports.logout = exports.refreshTokens = exports.login = exports.verifyEmail = exports.sendOtp = exports.register = void 0;
 const auth_service_1 = require("./auth.service");
-const getCookieOptions = (req) => {
-    const isSecure = req.secure || req.headers["x-forwarded-proto"] === "https";
-    return {
-        httpOnly: true,
-        secure: isSecure,
-        sameSite: isSecure ? "none" : "lax",
-        path: "/",
-    };
+const COOKIE_OPTIONS = {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
 };
 const register = async (req, res) => {
     try {
-        const { email, password, name, otp } = req.body;
-        const result = await auth_service_1.AuthService.register({ email, password, name, otp });
-        const cookieOptions = getCookieOptions(req);
+        const { email, password, name } = req.body;
+        const result = await auth_service_1.AuthService.register({ email, password, name });
+        // Set httpOnly cookies
         res.cookie("access_token", result.tokens.accessToken, {
-            ...cookieOptions,
+            ...COOKIE_OPTIONS,
             maxAge: 24 * 60 * 60 * 1000, // 24h
         });
         res.cookie("refresh_token", result.tokens.refreshToken, {
-            ...cookieOptions,
+            ...COOKIE_OPTIONS,
             maxAge: 7 * 24 * 60 * 60 * 1000, // 7d
         });
         res.status(201).json({
             success: true,
+            accessToken: result.tokens.accessToken,
+            refreshToken: result.tokens.refreshToken,
             user: result.user,
         });
     }
@@ -64,17 +63,19 @@ const login = async (req, res) => {
     try {
         const { email, password } = req.body;
         const result = await auth_service_1.AuthService.login({ email, password });
-        const cookieOptions = getCookieOptions(req);
+        // Set httpOnly cookies (not accessible by JavaScript — XSS safe)
         res.cookie("access_token", result.tokens.accessToken, {
-            ...cookieOptions,
+            ...COOKIE_OPTIONS,
             maxAge: 24 * 60 * 60 * 1000, // 24h
         });
         res.cookie("refresh_token", result.tokens.refreshToken, {
-            ...cookieOptions,
+            ...COOKIE_OPTIONS,
             maxAge: 7 * 24 * 60 * 60 * 1000, // 7d
         });
         res.status(200).json({
             success: true,
+            accessToken: result.tokens.accessToken,
+            refreshToken: result.tokens.refreshToken,
             user: result.user,
         });
     }
@@ -85,50 +86,37 @@ const login = async (req, res) => {
 exports.login = login;
 const refreshTokens = async (req, res) => {
     try {
-        const bodyToken = req.body.refreshToken;
-        const cookieToken = req.cookies?.refresh_token;
-        const refreshToken = bodyToken || cookieToken;
+        // Accept refresh token from body OR from httpOnly cookie
+        const refreshToken = req.body.refreshToken || req.cookies?.refresh_token;
         if (!refreshToken) {
-            console.warn("[Auth] Refresh token missing. Body:", !!bodyToken, "Cookie:", !!cookieToken);
-            return res.status(400).json({
-                success: false,
-                message: "Refresh token is required"
-            });
+            return res.status(400).json({ message: "Refresh token is required" });
         }
         const tokens = await auth_service_1.AuthService.refreshTokens(refreshToken);
-        const cookieOptions = getCookieOptions(req);
+        // Update cookies with new tokens
         res.cookie("access_token", tokens.accessToken, {
-            ...cookieOptions,
+            ...COOKIE_OPTIONS,
             maxAge: 24 * 60 * 60 * 1000,
         });
         res.cookie("refresh_token", tokens.refreshToken, {
-            ...cookieOptions,
+            ...COOKIE_OPTIONS,
             maxAge: 7 * 24 * 60 * 60 * 1000,
         });
         res.status(200).json({
             success: true,
+            ...tokens
         });
     }
     catch (error) {
-        console.error("[Auth] Refresh token failed:", error.message);
-        res.status(401).json({
-            success: false,
-            message: error.message || "Token refresh failed"
-        });
+        res.status(401).json({ message: error.message || "Token refresh failed" });
     }
 };
 exports.refreshTokens = refreshTokens;
 const logout = async (req, res) => {
     try {
-        if (req.user?.id) {
-            await auth_service_1.AuthService.logout(req.user.id).catch((err) => {
-                console.warn("[Logout] Failed to clear refreshToken in DB:", err.message);
-            });
-        }
+        await auth_service_1.AuthService.logout(req.user.id);
         // Clear httpOnly cookies
-        const cookieOptions = getCookieOptions(req);
-        res.clearCookie("access_token", { ...cookieOptions });
-        res.clearCookie("refresh_token", { ...cookieOptions });
+        res.clearCookie("access_token", { ...COOKIE_OPTIONS });
+        res.clearCookie("refresh_token", { ...COOKIE_OPTIONS });
         res.status(200).json({ success: true, message: "Logged out successfully" });
     }
     catch (error) {
@@ -159,49 +147,11 @@ const getMe = async (req, res) => {
 exports.getMe = getMe;
 const changePassword = async (req, res) => {
     try {
-        const userId = req.user.id;
-        const { currentPassword, newPassword } = req.body;
-        await auth_service_1.AuthService.changePassword(userId, { currentPassword, newPassword });
+        await auth_service_1.AuthService.changePassword(req.user.id, req.body);
         res.status(200).json({ success: true, message: "Password updated successfully" });
     }
     catch (error) {
-        res.status(400).json({ message: error.message || "Failed to update password" });
+        res.status(400).json({ message: error.message || "Password update failed" });
     }
 };
 exports.changePassword = changePassword;
-const forgotPassword = async (req, res) => {
-    try {
-        const { email } = req.body;
-        await auth_service_1.AuthService.forgotPassword(email);
-        res.status(200).json({ success: true, message: "If an account exists with this email, a reset link has been sent." });
-    }
-    catch (error) {
-        res.status(400).json({ message: error.message || "Failed to process request" });
-    }
-};
-exports.forgotPassword = forgotPassword;
-const resetPassword = async (req, res) => {
-    try {
-        const { token, password } = req.body;
-        await auth_service_1.AuthService.resetPassword(token, password);
-        res.status(200).json({ success: true, message: "Your password has been reset successfully." });
-    }
-    catch (error) {
-        res.status(400).json({ message: error.message || "Failed to reset password" });
-    }
-};
-exports.resetPassword = resetPassword;
-const deactivateAccount = async (req, res) => {
-    try {
-        await auth_service_1.AuthService.deactivateAccount(req.user.id);
-        // Clear cookies
-        const cookieOptions = getCookieOptions(req);
-        res.clearCookie("access_token", { ...cookieOptions });
-        res.clearCookie("refresh_token", { ...cookieOptions });
-        res.status(200).json({ success: true, message: "Account deactivated successfully" });
-    }
-    catch (error) {
-        res.status(500).json({ message: error.message || "Failed to deactivate account" });
-    }
-};
-exports.deactivateAccount = deactivateAccount;

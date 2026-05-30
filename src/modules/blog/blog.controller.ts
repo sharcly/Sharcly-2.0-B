@@ -1,5 +1,4 @@
 import { Request, Response } from "express";
-import { AuthRequest } from "../../common/middlewares/auth.middleware";
 import { BlogService } from "./blog.service";
 
 export class BlogController {
@@ -23,12 +22,11 @@ export class BlogController {
     }
   }
 
-  static async createBlog(req: AuthRequest, res: Response) {
+  static async createBlog(req: Request, res: Response) {
     try {
-      const authorId = req.user?.id;
-      if (!authorId) return res.status(401).json({ success: false, message: "Unauthorized" });
-      const file = req.file as Express.Multer.File;
-      const blog = await BlogService.createBlog(req.body, authorId, file);
+      // @ts-ignore
+      const authorId = req.user.id;
+      const blog = await BlogService.createBlog(req.body, authorId);
       res.status(201).json({ success: true, blog });
     } catch (error: any) {
       res.status(500).json({ success: false, message: error.message });
@@ -37,8 +35,7 @@ export class BlogController {
 
   static async updateBlog(req: Request, res: Response) {
     try {
-      const file = req.file as Express.Multer.File;
-      const blog = await BlogService.updateBlog(req.params.id as string, req.body, file);
+      const blog = await BlogService.updateBlog(req.params.id as string, req.body);
       res.json({ success: true, blog });
     } catch (error: any) {
       res.status(500).json({ success: false, message: error.message });

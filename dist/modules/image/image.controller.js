@@ -9,71 +9,17 @@ const prisma_1 = require("../../common/lib/prisma");
 const getImage = async (req, res) => {
     try {
         const { id } = req.params;
-        if (!id || id === "undefined" || id === "null") {
-            return res.status(400).json({ message: "Valid image ID is required" });
+        // UUID validation
+        if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
+            return res.status(400).json({ message: "Invalid image ID format" });
         }
-        // UUID validation - softened to allow non-standard IDs but still avoid Prisma errors if possible
-        const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
-        let image = null;
-        if (isUUID) {
-            image = await prisma_1.prisma.productImage.findUnique({
-                where: { id: id }
-            });
-        }
-        else {
-            // If not a UUID, try to find by the 'url' field which might store filenames
-            image = await prisma_1.prisma.productImage.findFirst({
-                where: { url: id }
-            });
-        }
-        // If still not found in product images, check blog featured images
+        const image = await prisma_1.prisma.productImage.findUnique({
+            where: { id: id }
+        });
         if (!image || !image.data) {
-            // Check blog by ID (if UUID)
-            if (isUUID) {
-                const blog = await prisma_1.prisma.blog.findUnique({
-                    where: { id: id },
-                    select: { featuredImageData: true, featuredImageMimeType: true }
-                });
-                if (blog && blog.featuredImageData) {
-                    image = {
-                        data: blog.featuredImageData,
-                        mimeType: blog.featuredImageMimeType
-                    };
-                }
-            }
-            // If still not found, check blog by featuredImage filename
-            if (!image) {
-                const blog = await prisma_1.prisma.blog.findFirst({
-                    where: { featuredImage: id },
-                    select: { featuredImageData: true, featuredImageMimeType: true }
-                });
-                if (blog && blog.featuredImageData) {
-                    image = {
-                        data: blog.featuredImageData,
-                        mimeType: blog.featuredImageMimeType
-                    };
-                }
-            }
-        }
-        // If still not found in product/blog images, check cms images
-        if (!image || !image.data) {
-            if (isUUID) {
-                const cmsImg = await prisma_1.prisma.cmsImage.findUnique({
-                    where: { id: id }
-                });
-                if (cmsImg) {
-                    image = {
-                        data: cmsImg.data,
-                        mimeType: cmsImg.mimeType
-                    };
-                }
-            }
-        }
-        if (!image || !image.data) {
-            console.log(`[ImageServer] 404: Image ${id} not found in database`);
             return res.status(404).json({ message: "Image not found" });
         }
-        console.log(`[ImageServer] Streaming asset ${id} (${image.mimeType}) - Size: ${image.data.length} bytes`);
+        console.log(`[ImageServer] Streaming asset ${id} (${image.mimeType})`);
         // Set binary headers for cinematic delivery with CORP relaxation
         res.setHeader("Content-Type", image.mimeType || "image/jpeg");
         res.setHeader("Cache-Control", "public, max-age=2592000"); // 30 days cache
@@ -81,7 +27,7 @@ const getImage = async (req, res) => {
         return res.send(image.data);
     }
     catch (error) {
-        console.error("[ImageServer] Stream failure for ID:", req.params.id, error);
+        console.error("[ImageServer] Stream failure:", error);
         res.status(500).json({ message: "Internal server error" });
     }
 };

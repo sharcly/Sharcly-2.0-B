@@ -4,9 +4,8 @@ import { Pool } from "pg";
 import dotenv from "dotenv";
 
 dotenv.config();
-process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 
-const connectionString = process.env.POSTGRES_URL_NON_POOLING || process.env.POSTGRES_URL || process.env.DATABASE_URL;
+const connectionString = process.env.DATABASE_URL;
 const pool = new Pool({ 
   connectionString,
   ssl: {
@@ -44,7 +43,6 @@ async function main() {
 
   console.log('--- Seeding Roles ---');
   const roles = [
-    { name: 'Super Admin', slug: 'super_admin', description: 'Supreme access level with control over all system modules and analytics' },
     { name: 'Administrator', slug: 'admin', description: 'Total access to all system features' },
     { name: 'Manager', slug: 'manager', description: 'Manage products, orders and customers' },
     { name: 'Content Manager', slug: 'content_manager', description: 'Manage blogs and CMS content' },
@@ -59,7 +57,7 @@ async function main() {
     });
 
     // Assign permissions
-    if (r.slug === 'admin' || r.slug === 'super_admin') {
+    if (r.slug === 'admin') {
       const allPerms = await prisma.permission.findMany();
       for (const p of allPerms) {
         await prisma.rolePermission.upsert({
@@ -91,25 +89,11 @@ async function main() {
     }
   }
 
-  console.log('--- Assigning Roles to users ---');
-  const superAdminRole = await prisma.role.findUnique({ where: { slug: 'super_admin' } });
-  if (superAdminRole) {
-    await prisma.user.updateMany({
-      where: { email: 'admin@sharcly.com' }, 
-      data: { roleId: superAdminRole.id }
-    });
-    console.log('Assigned Super Admin role to admin@sharcly.com');
-  }
-
+  console.log('--- Assigning Admin Role to existing users ---');
   const adminRole = await prisma.role.findUnique({ where: { slug: 'admin' } });
   if (adminRole) {
     await prisma.user.updateMany({
-      where: { 
-        email: { 
-          contains: 'admin',
-          not: 'admin@sharcly.com'
-        } 
-      }, 
+      where: { email: { contains: 'admin' } }, 
       data: { roleId: adminRole.id }
     });
   }

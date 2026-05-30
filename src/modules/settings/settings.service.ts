@@ -33,15 +33,13 @@ export class SettingsService {
     const { 
       storeName, supportEmail, currency, logoUrl, 
       shippingCharge, freeShippingThreshold, taxRate,
-      primaryColor, secondaryColor, buttonRadius, siteTheme, navbarStyle,
-      restrictedStates
+      primaryColor, secondaryColor, buttonRadius, siteTheme, navbarStyle
     } = settingsData;
 
     const data = {
       storeName, supportEmail, currency, logoUrl, 
       shippingCharge, freeShippingThreshold, taxRate,
-      primaryColor, secondaryColor, buttonRadius, siteTheme, navbarStyle,
-      restrictedStates
+      primaryColor, secondaryColor, buttonRadius, siteTheme, navbarStyle
     };
 
     if (existing) {

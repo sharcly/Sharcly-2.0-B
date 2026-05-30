@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import { prisma } from "../lib/prisma";
 
-const ACCESS_TOKEN_SECRET = process.env.JWT_SECRET!;
+const ACCESS_TOKEN_SECRET = process.env.JWT_SECRET || "fallback_access_secret";
 
 export interface AuthRequest extends Request {
   user?: {
@@ -42,7 +42,6 @@ export const authenticate = async (
   try {
     const token = extractToken(req);
     if (!token) {
-      console.warn(`[AUTH] 401: Token missing for ${req.method} ${req.originalUrl} from origin: ${req.headers.origin || 'none'}`);
       return res.status(401).json({ message: "Authentication required" });
     }
 
@@ -67,7 +66,6 @@ export const authenticate = async (
     });
 
     if (!user) {
-      console.warn(`[AUTH] 401: User not found for ID ${decoded.id}`);
       return res.status(401).json({ message: "User not found" });
     }
 
@@ -77,8 +75,7 @@ export const authenticate = async (
 
     req.user = user as any;
     next();
-  } catch (error: any) {
-    console.error(`[AUTH] 401: Token verification failed: ${error.message}`);
+  } catch (error) {
     return res.status(401).json({ message: "Invalid or expired token" });
   }
 };
@@ -121,8 +118,8 @@ export const authorize = (...requiredPermissions: string[]) => {
       return res.status(401).json({ message: "Authentication required" });
     }
 
-    // Admin superuser check - if role slug is 'admin' or 'super_admin', grant all
-    if (req.user.userRole?.slug === 'admin' || req.user.userRole?.slug === 'super_admin') {
+    // Admin superuser check - if role slug is 'admin', grant all
+    if (req.user.userRole?.slug === 'admin') {
       return next();
     }
 

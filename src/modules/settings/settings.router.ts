@@ -9,7 +9,6 @@ import {
   getRefundReasons
 } from "./settings.controller";
 import { authenticate, authorize } from "../../common/middlewares/auth.middleware";
-import { validate, StoreSettingsSchema, CreateRegionSchema } from "../../common/middlewares/validate.middleware";
 
 const router = Router();
 
@@ -18,12 +17,12 @@ router.get("/", getStoreSettings);
 
 // Store Settings
 router.get("/store", authenticate, authorize("settings.manage"), getStoreSettings);
-router.patch("/store", authenticate, authorize("settings.manage"), validate(StoreSettingsSchema), updateStoreSettings);
-router.put("/", authenticate, authorize("settings.manage"), validate(StoreSettingsSchema), updateStoreSettings);
+router.patch("/store", authenticate, authorize("settings.manage"), updateStoreSettings);
+router.put("/", authenticate, authorize("settings.manage"), updateStoreSettings);
 
 // Regions
 router.get("/regions", authenticate, authorize("settings.manage"), getRegions);
-router.post("/regions", authenticate, authorize("settings.manage"), validate(CreateRegionSchema), createRegion);
+router.post("/regions", authenticate, authorize("settings.manage"), createRegion);
 router.delete("/regions/:id", authenticate, authorize("settings.manage"), deleteRegion);
 
 // Reasons

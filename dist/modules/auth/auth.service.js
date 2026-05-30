@@ -9,8 +9,8 @@ const bcryptjs_1 = __importDefault(require("bcryptjs"));
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const crypto_1 = __importDefault(require("crypto"));
 const email_service_1 = require("./email.service");
-const ACCESS_TOKEN_SECRET = process.env.JWT_SECRET;
-const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET;
+const ACCESS_TOKEN_SECRET = process.env.JWT_SECRET || "fallback_access_secret";
+const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET || "fallback_refresh_secret";
 const ACCESS_TOKEN_EXPIRY = "1h";
 const REFRESH_TOKEN_EXPIRY = "7d";
 if (process.env.NODE_ENV === "production") {
@@ -29,19 +29,17 @@ class AuthService {
         return { accessToken, refreshToken };
     }
     static async register(registerData) {
-        const { password, name, otp } = registerData;
-        const email = registerData.email?.toLowerCase().trim();
+        const { email, password, name, otp } = registerData;
         const existingUser = await prisma_1.prisma.user.findUnique({ where: { email } });
         if (existingUser) {
             throw new Error("User already exists");
         }
-        // Verify OTP — compare hashed value
+        // Verify OTP
         const otpRecord = await prisma_1.prisma.otp.findUnique({ where: { email } });
-        const hashedInputOtp = crypto_1.default.createHash("sha256").update(otp).digest("hex");
-        if (!otpRecord || otpRecord.code !== hashedInputOtp || otpRecord.expiresAt < new Date()) {
+        if (!otpRecord || otpRecord.code !== otp || otpRecord.expiresAt < new Date()) {
             throw new Error("Invalid or expired verification code.");
         }
-        const hashedPassword = await bcryptjs_1.default.hash(password, 10);
+        const hashedPassword = await bcryptjs_1.default.hash(password, 12);
         const verificationToken = crypto_1.default.randomBytes(32).toString("hex");
         const userRole = await prisma_1.prisma.role.findUnique({ where: { slug: "user" } });
         if (!userRole) {
@@ -90,21 +88,18 @@ class AuthService {
             data: { isEmailVerified: true, verificationToken: null }
         });
     }
-    static async sendOtp(rawEmail) {
-        const email = rawEmail.toLowerCase().trim();
+    static async sendOtp(email) {
         // Check if user already exists
         const existingUser = await prisma_1.prisma.user.findUnique({ where: { email } });
         if (existingUser) {
             throw new Error("An account with this email already exists.");
         }
-        const code = crypto_1.default.randomInt(100000, 999999).toString();
+        const code = Math.floor(100000 + Math.random() * 900000).toString();
         const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
-        // Hash OTP before storing — never store plain-text OTPs in DB
-        const hashedCode = crypto_1.default.createHash("sha256").update(code).digest("hex");
         await prisma_1.prisma.otp.upsert({
             where: { email },
-            update: { code: hashedCode, expiresAt },
-            create: { email, code: hashedCode, expiresAt }
+            update: { code, expiresAt },
+            create: { email, code, expiresAt }
         });
         try {
             await (0, email_service_1.sendOtpEmail)(email, code);
@@ -116,43 +111,25 @@ class AuthService {
         return true;
     }
     static async login(loginData) {
-        const { password } = loginData;
-        const email = loginData.email?.toLowerCase().trim();
+        const { email, password } = loginData;
         const user = await prisma_1.prisma.user.findUnique({
             where: { email },
             include: {
-                userRole: {
-                    include: {
-                        permissions: {
-                            include: {
-                                permission: true
-                            }
-                        }
-                    }
-                }
+                userRole: true
             }
         });
         if (!user) {
-            throw new Error("Account not found");
+            throw new Error("Invalid credentials");
         }
         if (user.isBlocked) {
             throw new Error("Your account is blocked. Please contact admin for support.");
         }
         const isMatch = await bcryptjs_1.default.compare(password, user.password);
         if (!isMatch) {
-            console.warn(`[Login] Password mismatch for: ${email}`);
             throw new Error("Invalid credentials");
         }
         const roleSlug = user.userRole?.slug || "user";
-        const permissions = user.userRole?.permissions.map(p => p.permission.slug) || [];
-        let tokens;
-        try {
-            tokens = await this.generateTokens(user.id, roleSlug);
-        }
-        catch (tokenError) {
-            console.error(`[Login] Token generation failed for ${email}:`, tokenError);
-            throw new Error("Failed to initialize session. Please try again later.");
-        }
+        const tokens = await this.generateTokens(user.id, roleSlug);
         return {
             tokens,
             user: {
@@ -160,7 +137,6 @@ class AuthService {
                 email: user.email,
                 name: user.name,
                 role: roleSlug,
-                permissions
             }
         };
     }
@@ -193,26 +169,14 @@ class AuthService {
             where: { id: userId },
             include: {
                 addresses: true,
-                userRole: {
-                    include: {
-                        permissions: {
-                            include: {
-                                permission: true
-                            }
-                        }
-                    }
-                }
+                userRole: true
             }
         });
         if (!user) {
             throw new Error("User not found");
         }
         const { password: _, refreshToken: __, verificationToken: ___, ...userWithoutSensitiveData } = user;
-        const permissions = user.userRole?.permissions.map(p => p.permission.slug) || [];
-        return {
-            ...userWithoutSensitiveData,
-            permissions
-        };
+        return userWithoutSensitiveData;
     }
     static async changePassword(userId, data) {
         const { currentPassword, newPassword } = data;
@@ -225,55 +189,10 @@ class AuthService {
         if (!isMatch) {
             throw new Error("Current password is incorrect");
         }
-        const hashedPassword = await bcryptjs_1.default.hash(newPassword, 10);
+        const hashedPassword = await bcryptjs_1.default.hash(newPassword, 12);
         return await prisma_1.prisma.user.update({
             where: { id: userId },
             data: { password: hashedPassword }
-        });
-    }
-    static async forgotPassword(email) {
-        const user = await prisma_1.prisma.user.findUnique({ where: { email: email.toLowerCase().trim() } });
-        if (!user) {
-            // Don't reveal if user exists for security
-            return;
-        }
-        const resetToken = jsonwebtoken_1.default.sign({
-            id: user.id,
-            purpose: "password_reset",
-            version: user.password.slice(-10) // One-time use trick
-        }, ACCESS_TOKEN_SECRET, { expiresIn: "7h" });
-        await (0, email_service_1.sendPasswordResetEmail)(user.email, resetToken);
-    }
-    static async resetPassword(token, newPassword) {
-        let payload;
-        try {
-            payload = jsonwebtoken_1.default.verify(token, ACCESS_TOKEN_SECRET);
-        }
-        catch (err) {
-            throw new Error("Invalid or expired reset token");
-        }
-        if (payload.purpose !== "password_reset") {
-            throw new Error("Invalid token purpose");
-        }
-        const user = await prisma_1.prisma.user.findUnique({ where: { id: payload.id } });
-        if (!user || user.password.slice(-10) !== payload.version) {
-            throw new Error("This reset link has already been used or is invalid.");
-        }
-        const hashedPassword = await bcryptjs_1.default.hash(newPassword, 10);
-        await prisma_1.prisma.user.update({
-            where: { id: payload.id },
-            data: {
-                password: hashedPassword,
-                refreshToken: null // Logout from all devices on password reset
-            }
-        });
-    }
-    static async deactivateAccount(userId) {
-        // Simply block the user or mark as deleted
-        // For now, we'll mark as isBlocked and clear refreshToken
-        return await prisma_1.prisma.user.update({
-            where: { id: userId },
-            data: { isBlocked: true, refreshToken: null }
         });
     }
 }

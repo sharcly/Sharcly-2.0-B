@@ -54,10 +54,8 @@ model User {
   refreshToken      String?   @unique
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
-  stripeCustomerId  String?
-  cart              Json?
-  blogs             Blog[]
   addresses         Address[]
+  blogs             Blog[]
   orders            Order[]
   reviews           Review[]
   userRole          Role?     @relation(fields: [roleId], references: [id])
@@ -128,12 +126,6 @@ model Product {
   subtitle        String?
   weight          Float?
   width           Float?
-  featured        Boolean          @default(false)
-  isComingSoon    Boolean          @default(false)
-  isPublished     Boolean          @default(true)
-  actualPrice     Decimal?
-  ingredients     String?
-  testimonials    Json?
   tags            ProductTag[]     @relation("ProductToTag")
   orderItems      OrderItem[]
   images          ProductImage[]
@@ -142,7 +134,6 @@ model Product {
   type            ProductType?     @relation(fields: [typeId], references: [id])
   reviews         Review[]
   collections     Collection[]     @relation("ProductCollections")
-  flavours        Flavour[]        @relation("ProductFlavours")
   wishlistedBy    User[]           @relation("UserWishlist")
 
   @@map("products")
@@ -161,7 +152,6 @@ model ProductVariant {
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
   image             String?
-  actualPrice       Decimal?
   product           Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@map("product_variants")
@@ -199,57 +189,48 @@ model Order {
   notes             String?
   createdAt         DateTime    @default(now())
   updatedAt         DateTime    @updatedAt
-  cancelReason      String?
   items             OrderItem[]
-  statusHistory     OrderStatusHistory[]
   coupon            Coupon?     @relation(fields: [couponId], references: [id])
   user              User        @relation(fields: [userId], references: [id])
 
   @@map("orders")
 }
 
-model OrderStatusHistory {
-  id        String      @id @default(uuid())
-  orderId   String
-  status    OrderStatus
-  createdAt DateTime    @default(now())
-  order     Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
-
-  @@map("order_status_history")
-}
-
 model OrderItem {
   id        String  @id @default(uuid())
   orderId   String
-  productId String?
+  productId String
   quantity  Int
   price     Decimal
   order     Order   @relation(fields: [orderId], references: [id])
-  product   Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  product   Product @relation(fields: [productId], references: [id])
 
   @@map("order_items")
 }
 
 model Blog {
-  id                    String     @id @default(uuid())
-  title                 String
-  slug                  String     @unique
-  content               String
-  authorId              String
-  metaTitle             String?
-  createdAt             DateTime   @default(now())
-  updatedAt             DateTime   @updatedAt
-  category              String?
-  excerpt               String?
-  featuredImage         String?
-  keywords              String?
-  metaDescription       String?
-  publishedAt           DateTime?
-  status                BlogStatus @default(DRAFT)
-  tags                  String[]
-  featuredImageData     Bytes?
-  featuredImageMimeType String?
-  author                User       @relation(fields: [authorId], references: [id])
+  id              String     @id @default(uuid())
+  title           String
+  slug            String     @unique
+  content         String
+  authorId        String
+  metaTitle       String?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+  category        String?
+  excerpt         String?
+  featuredImage   String?
+  keywords        String?
+  metaDescription String?
+  publishedAt     DateTime?
+  status          BlogStatus @default(DRAFT)
+  tags            String[]
+  author          User       @relation(fields: [authorId], references: [id])
+}
+
+enum DiscountType {
+  PERCENTAGE
+  FIXED
 }
 
 model Coupon {
@@ -268,21 +249,14 @@ model Coupon {
 }
 
 model WelcomeOffer {
-  id           String       @id @default(uuid())
-  title        String
-  description  String
-  discount     Decimal
-  isActive     Boolean      @default(true)
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
-  discountType String       @default("FIXED")
-  footerText   String?
-  image        String?
-  options      Json?
-  step2Text    String?
-  step2Title   String?
-  subtitle     String?
-  claims       OfferClaim[]
+  id          String   @id @default(uuid())
+  title       String
+  description String
+  discount    Decimal
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  claims      OfferClaim[]
 
   @@map("welcome_offers")
 }
@@ -299,6 +273,7 @@ model OfferClaim {
   @@map("offer_claims")
 }
 
+
 model Review {
   id        String   @id @default(uuid())
   productId String
@@ -307,7 +282,7 @@ model Review {
   comment   String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  product   Product  @relation(fields: [productId], references: [id])
   user      User     @relation(fields: [userId], references: [id])
 
   @@unique([productId, userId])
@@ -354,7 +329,6 @@ model StoreSettings {
   shippingCharge        Decimal  @default(0)
   siteTheme             String   @default("light")
   taxRate               Decimal  @default(0)
-  restrictedStates      String[] @default([])
 
   @@map("store_settings")
 }
@@ -485,6 +459,29 @@ model ShippingRate {
   @@map("shipping_rates")
 }
 
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PREPARING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
+enum ProductStatus {
+  DRAFT
+  PUBLISHED
+}
+
+enum BlogStatus {
+  DRAFT
+  PUBLISHED
+  SCHEDULED
+}
+
 model WholesaleInquiry {
   id              String   @id @default(uuid())
   businessName    String   @map("business_name")
@@ -516,7 +513,7 @@ model Testimonial {
   name      String
   role      String
   company   String?
-  message   String
+  message   String   @db.Text
   rating    Int?
   image     String?
   featured  Boolean  @default(false)
@@ -539,125 +536,10 @@ model ApiIntegration {
 
 model Otp {
   id        String   @id @default(uuid())
-  email     String   @unique
+  email     String
   code      String
   expiresAt DateTime
   createdAt DateTime @default(now())
 
   @@map("otps")
 }
-
-model NewsletterSubscriber {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  createdAt DateTime @default(now())
-  isActive  Boolean  @default(true)
-
-  @@map("newsletter_subscribers")
-}
-
-model ContactMessage {
-  id        String   @id @default(uuid())
-  name      String
-  email     String
-  subject   String
-  message   String
-  status    String   @default("UNREAD")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@map("contact_messages")
-}
-
-model Faq {
-  id        String   @id @default(uuid())
-  question  String
-  answer    String
-  category  String?
-  order     Int      @default(0)
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  @@map("faqs")
-}
-
-model Flavour {
-  id        String    @id @default(uuid())
-  name      String    @unique
-  slug      String    @unique
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  products  Product[] @relation("ProductFlavours")
-
-  @@map("flavours")
-}
-
-model PaymentGateway {
-  id             String   @id @default(uuid())
-  name           String
-  provider       String   // e.g., "stripe" | "paypal" | "razorpay"
-  publishableKey String?  // Specific to Stripe, etc.
-  secretKey      String   // Secret API Key or Secret Key
-  webhookSecret  String?  // Webhook validation secret
-  config         Json?    // Generic JSON storage for provider-specific credentials
-  rotationLimit  Int      @default(10) // Max successful payments in a row before rotation
-  paymentCount   Int      @default(0)  // Current transaction count in this cycle
-  totalPayments  Int      @default(0)  // Lifetime payments count
-  isActive       Boolean  @default(true)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-
-  @@map("payment_gateways")
-}
-
-
-
-enum DiscountType {
-  PERCENTAGE
-  FIXED
-}
-
-enum OrderStatus {
-  PENDING
-  CONFIRMED
-  PREPARING
-  SHIPPED
-  DELIVERED
-  CANCELLED
-}
-
-enum ProductStatus {
-  DRAFT
-  PUBLISHED
-  ARCHIVED
-}
-
-enum BlogStatus {
-  DRAFT
-  PUBLISHED
-  SCHEDULED
-}
-
-model CmsImage {
-  id        String   @id @default(uuid())
-  data      Bytes
-  mimeType  String
-  createdAt DateTime @default(now())
-
-  @@map("cms_images")
-}
-
-model CmsVideo {
-  id        String   @id @default(uuid())
-  data      Bytes
-  mimeType  String
-  purpose   String   @default("hero")
-  fileName  String?
-  fileSize  Int      @default(0)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@map("cms_videos")
-}
-

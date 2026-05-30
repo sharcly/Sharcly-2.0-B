@@ -13,12 +13,7 @@ import {
   deleteRole,
   getAllIntegrations,
   upsertIntegration,
-  deleteIntegration,
-  getAllPaymentGateways,
-  createPaymentGateway,
-  updatePaymentGateway,
-  deletePaymentGateway,
-  resetPaymentGatewayCounter
+  deleteIntegration
 } from "./admin.controller";
 import { authenticate, authorize } from "../../common/middlewares/auth.middleware";
 import { validate, AdminCreateUserSchema, AdminUpdateUserSchema } from "../../common/middlewares/validate.middleware";
@@ -171,12 +166,5 @@ router.delete("/roles/:id", deleteRole);
 router.get("/integrations", getAllIntegrations);
 router.post("/integrations", upsertIntegration);
 router.delete("/integrations/:id", deleteIntegration);
-
-// Payment Gateways Management
-router.get("/payment-gateways", getAllPaymentGateways);
-router.post("/payment-gateways", createPaymentGateway);
-router.patch("/payment-gateways/:id", updatePaymentGateway);
-router.delete("/payment-gateways/:id", deletePaymentGateway);
-router.post("/payment-gateways/:id/reset", resetPaymentGatewayCounter);
 
 export default router;

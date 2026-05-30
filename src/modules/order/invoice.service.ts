@@ -1,8 +1,6 @@
 import PDFDocument from "pdfkit";
 import { Response } from "express";
 import { format } from "date-fns";
-import fs from "fs";
-import path from "path";
 
 export class InvoiceService {
   static async generateInvoiceBuffer(order: any): Promise<Buffer> {
@@ -48,16 +46,10 @@ export class InvoiceService {
       .text("Canada | hello@sharcly.com", margin, 65);
 
     // Logo (Right)
-    const logoPath = path.join(__dirname, "../../../../frontend/public/assets/final-Logo-1.png");
-    
-    if (fs.existsSync(logoPath)) {
-      doc.image(logoPath, pageWidth - margin - 80, 25, { width: 80 });
-    } else {
-      doc
-        .font("Helvetica-Bold")
-        .fontSize(24)
-        .text("sharcly", pageWidth - margin - 100, 30, { align: "right", width: 100 });
-    }
+    doc
+      .font("Helvetica-Bold")
+      .fontSize(24)
+      .text("sharcly", pageWidth - margin - 100, 30, { align: "right", width: 100 });
     
     doc
       .fontSize(6)

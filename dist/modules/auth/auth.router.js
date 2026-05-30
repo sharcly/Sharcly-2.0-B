@@ -1,25 +1,10 @@
 "use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const auth_controller_1 = require("./auth.controller");
 const auth_middleware_1 = require("../../common/middlewares/auth.middleware");
 const validate_middleware_1 = require("../../common/middlewares/validate.middleware");
-const express_rate_limit_1 = __importDefault(require("express-rate-limit"));
-const authLimiter = (0, express_rate_limit_1.default)({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 10, // Limit each IP to 10 requests per window
-    message: {
-        success: false,
-        message: "Too many attempts from this IP, please try again after 15 minutes",
-    },
-    standardHeaders: true,
-    legacyHeaders: false,
-});
 const router = (0, express_1.Router)();
-// ... (rest of the file)
 /**
  * @swagger
  * tags:
@@ -68,8 +53,8 @@ const router = (0, express_1.Router)();
  *       400:
  *         description: User already exists
  */
-router.post("/register", authLimiter, (0, validate_middleware_1.validate)(validate_middleware_1.RegisterSchema), auth_controller_1.register);
-router.post("/send-otp", authLimiter, auth_controller_1.sendOtp);
+router.post("/register", (0, validate_middleware_1.validate)(validate_middleware_1.RegisterSchema), auth_controller_1.register);
+router.post("/send-otp", auth_controller_1.sendOtp);
 /**
  * @swagger
  * /api/auth/login:
@@ -109,7 +94,7 @@ router.post("/send-otp", authLimiter, auth_controller_1.sendOtp);
  *       401:
  *         description: Invalid credentials
  */
-router.post("/login", authLimiter, (0, validate_middleware_1.validate)(validate_middleware_1.LoginSchema), auth_controller_1.login);
+router.post("/login", (0, validate_middleware_1.validate)(validate_middleware_1.LoginSchema), auth_controller_1.login);
 /**
  * @swagger
  * /api/auth/refresh-token:
@@ -146,7 +131,7 @@ router.post("/refresh-token", auth_controller_1.refreshTokens);
  *       200:
  *         description: Logged out successfully
  */
-router.post("/logout", auth_middleware_1.optionalAuth, auth_controller_1.logout);
+router.post("/logout", auth_middleware_1.authenticate, auth_controller_1.logout);
 /**
  * @swagger
  * /api/auth/verify-email:
@@ -193,8 +178,5 @@ router.get("/verify-email", auth_controller_1.verifyEmail);
  */
 router.get("/profile", auth_middleware_1.authenticate, auth_controller_1.getProfile);
 router.get("/me", auth_middleware_1.authenticate, auth_controller_1.getMe);
-router.patch("/change-password", auth_middleware_1.authenticate, (0, validate_middleware_1.validate)(validate_middleware_1.ChangePasswordSchema), auth_controller_1.changePassword);
-router.post("/forgot-password", (0, validate_middleware_1.validate)(validate_middleware_1.ForgotPasswordSchema), auth_controller_1.forgotPassword);
-router.post("/reset-password", (0, validate_middleware_1.validate)(validate_middleware_1.ResetPasswordSchema), auth_controller_1.resetPassword);
-router.patch("/deactivate", auth_middleware_1.authenticate, auth_controller_1.deactivateAccount);
+router.post("/change-password", auth_middleware_1.authenticate, (0, validate_middleware_1.validate)(validate_middleware_1.ChangePasswordSchema), auth_controller_1.changePassword);
 exports.default = router;
