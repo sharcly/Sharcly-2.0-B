@@ -223,7 +223,7 @@ export class StatsService {
         .slice(0, 4);
 
     // 5. Get Product Details for Top Products
-    const productIds = topProducts.map(tp => tp.productId);
+    const productIds = topProducts.map(tp => tp.productId).filter((id): id is string => id !== null && id !== undefined);
     const products = await prisma.product.findMany({
         where: { id: { in: productIds } },
         select: { 
