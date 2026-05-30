@@ -7,7 +7,16 @@ dotenv.config();
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 
 const rawUrl = process.env.DATABASE_URL || process.env.POSTGRES_URL || process.env.POSTGRES_PRISMA_URL;
-const connectionString = rawUrl?.replace("&sslmode=require", "").replace("?sslmode=require", "");
+let connectionString = rawUrl;
+if (rawUrl) {
+  try {
+    const parsed = new URL(rawUrl);
+    parsed.searchParams.delete("sslmode");
+    connectionString = parsed.toString();
+  } catch (e) {
+    console.error("Failed to parse database connection URL:", e);
+  }
+}
 
 const globalForPrisma = global as unknown as { prisma: PrismaClient };
 
