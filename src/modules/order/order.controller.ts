@@ -1,4 +1,3 @@
-import { Request, Response } from "express";
 import { OrderService } from "./order.service";
 import { InvoiceService } from "./invoice.service";
 
@@ -13,8 +12,8 @@ export const createOrder = async (req: any, res: Response) => {
       return res.status(400).json({ message: "Email is required to place an order" });
     }
 
-    const { order, clientSecret } = await OrderService.createOrder(userId, email, orderData);
-    res.status(201).json({ success: true, order, clientSecret });
+    const order = await OrderService.createOrder(userId, email, orderData);
+    res.status(201).json({ success: true, order });
   } catch (error: any) {
     res.status(400).json({ message: error.message || "Order placement failed" });
   }
@@ -95,31 +94,5 @@ export const downloadInvoice = async (req: any, res: Response) => {
   } catch (error) {
     console.error("Invoice generation error:", error);
     res.status(500).json({ message: "Failed to generate invoice" });
-  }
-};
-
-export const cancelOrder = async (req: any, res: any) => {
-  try {
-    const { id } = req.params;
-    const { reason } = req.body;
-    
-    if (!reason) {
-      return res.status(400).json({ message: "Cancellation reason is required" });
-    }
-
-    const order = await OrderService.cancelOrder(id, req.user.id, reason);
-    res.status(200).json({ success: true, order });
-  } catch (error: any) {
-    res.status(400).json({ message: error.message || "Failed to cancel order" });
-  }
-};
-
-export const cancelFailedPayment = async (req: any, res: any) => {
-  try {
-    const { id } = req.params;
-    await OrderService.handleFailedPaymentCleanup(id);
-    res.status(200).json({ success: true, message: "Failed payment order cleaned up successfully" });
-  } catch (error: any) {
-    res.status(400).json({ message: error.message || "Failed to cleanup order" });
   }
 };

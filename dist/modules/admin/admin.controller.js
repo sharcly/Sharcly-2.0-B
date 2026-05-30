@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.deleteIntegration = exports.upsertIntegration = exports.getAllIntegrations = exports.deleteRole = exports.updateRole = exports.createRole = exports.getPermissions = exports.getRoles = exports.adminUpdateUser = exports.adminCreateUser = exports.deleteUser = exports.toggleBlockUser = exports.updateUserRole = exports.getAllUsers = void 0;
+exports.deleteRole = exports.updateRole = exports.createRole = exports.getPermissions = exports.getRoles = exports.adminUpdateUser = exports.adminCreateUser = exports.deleteUser = exports.toggleBlockUser = exports.updateUserRole = exports.getAllUsers = void 0;
 const admin_service_1 = require("./admin.service");
 const getAllUsers = async (req, res) => {
     try {
@@ -130,38 +130,3 @@ const deleteRole = async (req, res) => {
     }
 };
 exports.deleteRole = deleteRole;
-const getAllIntegrations = async (req, res) => {
-    try {
-        const integrations = await admin_service_1.AdminService.getAllIntegrations();
-        res.status(200).json({ success: true, integrations });
-    }
-    catch (error) {
-        res.status(500).json({ message: error.message || "Failed to fetch integrations" });
-    }
-};
-exports.getAllIntegrations = getAllIntegrations;
-const upsertIntegration = async (req, res) => {
-    try {
-        const { platform, apiKey, config } = req.body;
-        if (!platform || !apiKey) {
-            return res.status(400).json({ message: "Platform and API Key are required" });
-        }
-        const integration = await admin_service_1.AdminService.upsertIntegration({ platform, apiKey, config });
-        res.status(200).json({ success: true, integration });
-    }
-    catch (error) {
-        res.status(500).json({ message: error.message || "Failed to save integration" });
-    }
-};
-exports.upsertIntegration = upsertIntegration;
-const deleteIntegration = async (req, res) => {
-    try {
-        const { id } = req.params;
-        await admin_service_1.AdminService.deleteIntegration(id);
-        res.status(200).json({ success: true, message: "Integration deleted successfully" });
-    }
-    catch (error) {
-        res.status(500).json({ message: error.message || "Failed to delete integration" });
-    }
-};
-exports.deleteIntegration = deleteIntegration;

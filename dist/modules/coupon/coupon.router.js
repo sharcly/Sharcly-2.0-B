@@ -31,7 +31,7 @@ const router = (0, express_1.Router)();
  *       400:
  *         description: Invalid or expired coupon
  */
-router.post("/validate", coupon_controller_1.validateCoupon);
+router.get("/validate/:code", auth_middleware_1.authenticate, coupon_controller_1.validateCoupon);
 /**
  * @swagger
  * /api/coupons:

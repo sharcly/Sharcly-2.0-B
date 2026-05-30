@@ -35,19 +35,13 @@ const deleteCoupon = async (req, res) => {
 exports.deleteCoupon = deleteCoupon;
 const validateCoupon = async (req, res) => {
     try {
-        const { code } = req.body;
+        const { code } = req.params;
         const result = await coupon_service_1.CouponService.validateCoupon(code);
         if (!result.valid) {
             const status = result.message === "Coupon not found" ? 404 : 400;
             return res.status(status).json({ message: result.message });
         }
-        res.status(200).json({
-            success: true,
-            valid: true,
-            discount: result.discount,
-            discountType: result.discountType,
-            code: result.code
-        });
+        res.status(200).json({ success: true, discount: result.discount, code: result.code });
     }
     catch (error) {
         res.status(500).json({ message: "Failed to validate coupon" });

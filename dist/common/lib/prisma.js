@@ -9,7 +9,6 @@ const adapter_pg_1 = require("@prisma/adapter-pg");
 const pg_1 = require("pg");
 const dotenv_1 = __importDefault(require("dotenv"));
 dotenv_1.default.config();
-process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 const connectionString = process.env.DATABASE_URL;
 const globalForPrisma = global;
 let prisma;

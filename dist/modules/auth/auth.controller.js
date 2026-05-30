@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.changePassword = exports.getMe = exports.getProfile = exports.logout = exports.refreshTokens = exports.login = exports.verifyEmail = exports.sendOtp = exports.register = void 0;
+exports.changePassword = exports.getMe = exports.getProfile = exports.logout = exports.refreshTokens = exports.login = exports.verifyEmail = exports.register = void 0;
 const auth_service_1 = require("./auth.service");
 const COOKIE_OPTIONS = {
     httpOnly: true,
@@ -33,19 +33,6 @@ const register = async (req, res) => {
     }
 };
 exports.register = register;
-const sendOtp = async (req, res) => {
-    try {
-        const { email } = req.body;
-        if (!email)
-            return res.status(400).json({ message: "Email is required" });
-        await auth_service_1.AuthService.sendOtp(email);
-        res.status(200).json({ success: true, message: "Verification code sent to your email" });
-    }
-    catch (error) {
-        res.status(400).json({ message: error.message || "Failed to send OTP" });
-    }
-};
-exports.sendOtp = sendOtp;
 const verifyEmail = async (req, res) => {
     try {
         const { token } = req.query;

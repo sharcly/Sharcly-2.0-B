@@ -20,7 +20,6 @@ class BlogController {
             res.json({ success: true, blog });
         }
         catch (error) {
-            console.error("Error in getBlogBySlug:", error);
             res.status(500).json({ success: false, message: error.message });
         }
     }

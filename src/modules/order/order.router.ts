@@ -5,9 +5,7 @@ import {
   getAllOrders, 
   getOrderById,
   updateOrderStatus,
-  downloadInvoice,
-  cancelOrder,
-  cancelFailedPayment
+  downloadInvoice
 } from "./order.controller";
 import { authenticate, authorize, optionalAuth } from "../../common/middlewares/auth.middleware";
 import { validate, CreateOrderSchema, UpdateOrderStatusSchema } from "../../common/middlewares/validate.middleware";
@@ -138,7 +136,5 @@ router.patch("/:id/status", authenticate, authorize("orders.manage"), validate(U
  *       - bearerAuth: []
  */
 router.get("/:id/invoice", authenticate, downloadInvoice);
-router.post("/:id/cancel", authenticate, cancelOrder);
-router.post("/:id/cancel-failed-payment", cancelFailedPayment);
 
 export default router;

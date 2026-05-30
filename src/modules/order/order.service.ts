@@ -3,7 +3,6 @@ import { OrderStatus } from "@prisma/client";
 import { sendOrderConfirmation } from "../auth/email.service";
 import { KlaviyoService } from "../marketing/klaviyo.service";
 import { SeoService } from "../seo/seo.service";
-import { PaymentService } from "../payment/payment.service";
 
 import crypto from "crypto";
 
@@ -171,32 +170,14 @@ export class OrderService {
       console.warn("Klaviyo Order Tracking Failed:", kErr);
     }
 
-    // 5. Handle Stripe Payment Intent if online
-    let clientSecret: string | undefined = undefined;
-    if (paymentMethod === 'online') {
-      try {
-        const paymentIntent = await PaymentService.createPaymentIntent(
-          Number(order.totalAmount),
-          "usd",
-          { orderId: order.id, userId: finalUserId }
-        );
-        clientSecret = paymentIntent.client_secret || undefined;
-      } catch (pErr: any) {
-        console.error("Stripe Payment Intent Creation Failed:", pErr);
-        throw new Error(`Failed to initialize payment: ${pErr.message || "Stripe error"}`);
-      }
+    // Send Email Confirmation
+    try {
+      await sendOrderConfirmation(email, order);
+    } catch (eErr) {
+      console.warn("Email Confirmation Failed:", eErr);
     }
 
-    // Send Email Confirmation only for non-online (e.g. cod) orders since online orders are still pending payment
-    if (paymentMethod !== 'online') {
-      try {
-        await sendOrderConfirmation(email, order);
-      } catch (eErr) {
-        console.warn("Email Confirmation Failed:", eErr);
-      }
-    }
-
-    return { order, clientSecret };
+    return order;
   }
 
   static async getMyOrders(userId: string) {
@@ -288,131 +269,5 @@ export class OrderService {
     }
 
     return updatedOrder;
-  }
-
-  static async cancelOrder(id: string, userId: string, cancelReason: string) {
-    const order = await prisma.order.findUnique({
-      where: { id },
-      include: { items: true }
-    });
-
-    if (!order) throw new Error("Order not found");
-    if (order.userId !== userId) throw new Error("Access denied");
-    if (!([OrderStatus.PENDING, OrderStatus.CONFIRMED] as OrderStatus[]).includes(order.status)) {
-      throw new Error(`Order cannot be cancelled because it is already ${order.status.toLowerCase()}.`);
-    }
-
-    return await prisma.$transaction(async (tx: any) => {
-      // 0. Record History
-      await tx.orderStatusHistory.create({
-        data: {
-          orderId: id,
-          status: OrderStatus.CANCELLED
-        }
-      });
-
-      // 1. Update Order Status
-      const updatedOrder = await tx.order.update({
-        where: { id },
-        data: { 
-          status: OrderStatus.CANCELLED,
-          cancelReason
-        },
-        include: { statusHistory: { orderBy: { createdAt: 'asc' } } }
-      });
-
-      // 2. Restore stock
-      for (const item of order.items) {
-        await tx.product.update({
-          where: { id: item.productId },
-          data: { stock: { increment: item.quantity } }
-        });
-      }
-
-      // 3. Handle Refund if applicable
-      if (order.paymentMethod === 'online' && order.status === OrderStatus.CONFIRMED) {
-        try {
-          await PaymentService.refundOrder(id);
-        } catch (rErr: any) {
-          console.error(`[CANCEL_ORDER] Refund failed for order ${id}:`, rErr.message);
-          throw rErr; 
-        }
-      }
-
-      // 4. Send Cancellation Email
-      try {
-        const { sendOrderStatusUpdate } = require("../auth/email.service");
-        const user = await tx.user.findUnique({ where: { id: userId }, select: { email: true } });
-        if (user) {
-          await sendOrderStatusUpdate(user.email, updatedOrder);
-        }
-      } catch (eErr) {
-        console.warn("Cancellation Email Failed:", eErr);
-      }
-
-      return updatedOrder;
-    });
-  }
-
-  static async handleFailedPaymentCleanup(orderId: string) {
-    const order = await prisma.order.findUnique({
-      where: { id: orderId },
-      include: { items: true, user: { select: { email: true } } }
-    });
-
-    if (!order) return;
-
-    // Only cleanup if the order is still PENDING and was placed online
-    if (order.status !== OrderStatus.PENDING || order.paymentMethod !== 'online') {
-      return;
-    }
-
-    const updatedOrder = await prisma.$transaction(async (tx: any) => {
-      // 1. Revert coupon usage if coupon was applied
-      if (order.couponId) {
-        await tx.coupon.update({
-          where: { id: order.couponId },
-          data: { usedCount: { decrement: 1 } }
-        });
-      }
-
-      // 2. Revert inventory stock
-      for (const item of order.items) {
-        if (item.productId) {
-          await tx.product.update({
-            where: { id: item.productId },
-            data: { stock: { increment: item.quantity } }
-          });
-        }
-      }
-
-      // 3. Add to OrderStatusHistory
-      await tx.orderStatusHistory.create({
-        data: {
-          orderId,
-          status: OrderStatus.CANCELLED
-        }
-      });
-
-      // 4. Update the order status to CANCELLED and set reason
-      return await tx.order.update({
-        where: { id: orderId },
-        data: {
-          status: OrderStatus.CANCELLED,
-          cancelReason: "payment_failed"
-        }
-      });
-    });
-
-    // 5. Send Payment Failed email to the customer with branding!
-    try {
-      const email = order.user?.email || (order as any).email;
-      if (email) {
-        const { sendPaymentFailedEmail } = require("../auth/email.service");
-        await sendPaymentFailedEmail(email, updatedOrder);
-      }
-    } catch (emailErr) {
-      console.warn("Payment Failed Email failed to send:", emailErr);
-    }
   }
 }

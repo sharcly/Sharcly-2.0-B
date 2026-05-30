@@ -75,7 +75,7 @@ exports.CreateOrderSchema = zod_1.z.object({
     couponCode: zod_1.z.string().max(50, "Coupon code too long").optional(),
 });
 exports.UpdateOrderStatusSchema = zod_1.z.object({
-    status: zod_1.z.enum(["PENDING", "CONFIRMED", "PREPARING", "SHIPPED", "DELIVERED", "CANCELLED"]),
+    status: zod_1.z.enum(["PENDING", "ACCEPTED", "SHIPPED", "DELIVERED", "CANCELLED"]),
     trackingNumber: zod_1.z.string().max(100).optional(),
     carrier: zod_1.z.string().max(100).optional(),
     estimatedDelivery: zod_1.z.string().optional(),

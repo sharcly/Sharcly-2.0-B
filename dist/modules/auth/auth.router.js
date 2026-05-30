@@ -54,7 +54,6 @@ const router = (0, express_1.Router)();
  *         description: User already exists
  */
 router.post("/register", (0, validate_middleware_1.validate)(validate_middleware_1.RegisterSchema), auth_controller_1.register);
-router.post("/send-otp", auth_controller_1.sendOtp);
 /**
  * @swagger
  * /api/auth/login:
