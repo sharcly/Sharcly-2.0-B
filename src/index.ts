@@ -60,11 +60,22 @@ app.use(helmet({
 }));
 
 app.use(cors({
-  origin: [
-    process.env.FRONTEND_URL || "http://localhost:3000",
-    "http://localhost:3000",
-    "http://207.2.123.86:3000"
-  ],
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true);
+    const allowedPatterns = [
+      /localhost:\d+$/,
+      /207\.2\.123\.86(:\d+)?$/,
+      /\.vercel\.app$/,
+      /sharcly/,
+      /shracly/
+    ];
+    const isAllowed = allowedPatterns.some(pattern => pattern.test(origin));
+    if (isAllowed) {
+      callback(null, true);
+    } else {
+      callback(new Error(`Origin ${origin} not allowed by CORS`));
+    }
+  },
   credentials: true, // Required for httpOnly cookies
 }));
 
