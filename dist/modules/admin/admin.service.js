@@ -9,6 +9,12 @@ const bcryptjs_1 = __importDefault(require("bcryptjs"));
 class AdminService {
     static async getAllUsers() {
         return await prisma_1.prisma.user.findMany({
+            where: {
+                OR: [
+                    { userRole: null },
+                    { userRole: { slug: { not: "admin" } } }
+                ]
+            },
             select: {
                 id: true,
                 email: true,
@@ -110,6 +116,9 @@ class AdminService {
     }
     static async getRoles() {
         return await prisma_1.prisma.role.findMany({
+            where: {
+                slug: { not: "admin" }
+            },
             include: {
                 _count: {
                     select: { users: true }
@@ -179,6 +188,22 @@ class AdminService {
             throw new Error("Cannot delete role that is assigned to users");
         }
         return await prisma_1.prisma.role.delete({ where: { id } });
+    }
+    static async getAllIntegrations() {
+        return await prisma_1.prisma.apiIntegration.findMany({
+            orderBy: { createdAt: "desc" }
+        });
+    }
+    static async upsertIntegration(data) {
+        const { platform, apiKey, config } = data;
+        return await prisma_1.prisma.apiIntegration.upsert({
+            where: { platform },
+            update: { apiKey, config, updatedAt: new Date() },
+            create: { platform, apiKey, config }
+        });
+    }
+    static async deleteIntegration(id) {
+        return await prisma_1.prisma.apiIntegration.delete({ where: { id } });
     }
 }
 exports.AdminService = AdminService;

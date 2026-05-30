@@ -6,7 +6,7 @@
   "scripts": {
     "kill-port": "node scripts/kill-port.js",
     "dev": "set TS_NODE_TRANSPILE_ONLY=true && nodemon",
-    "build": "tsc",
+    "build": "npx prisma generate && tsc",
     "bootstrap": "ts-node src/common/utils/bootstrap.ts",
     "test": "echo \"Error: no test specified\" && exit 1",
     "lint": "eslint ."

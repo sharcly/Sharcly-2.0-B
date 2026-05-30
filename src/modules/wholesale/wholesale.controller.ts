@@ -113,7 +113,7 @@ export class WholesaleController {
       const { name, minOrder, discount, features, featured } = req.body;
 
       const plan = await prisma.pricingPlan.update({
-        where: { id },
+        where: { id: id as string },
         data: {
           name,
           minOrder,
@@ -136,7 +136,7 @@ export class WholesaleController {
     try {
       const { id } = req.params;
       await prisma.pricingPlan.delete({
-        where: { id },
+        where: { id: id as string },
       });
       console.log("Wholesale Plan deleted:", id);
       res.json({ success: true, message: "Plan deleted successfully" });
