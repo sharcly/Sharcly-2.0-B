@@ -1,6 +1,7 @@
 import { Resend } from "resend";
 import { InvoiceService } from "../order/invoice.service";
 import { Readable } from "stream";
+import { prisma } from "../../common/lib/prisma";
 
 const apiKey = process.env.RESEND_API_KEY;
 
@@ -9,8 +10,9 @@ if (!apiKey || apiKey === "re_...") {
 }
 
 const resend = apiKey && apiKey !== "re_..." ? new Resend(apiKey) : null;
-const fromEmail = process.env.RESEND_FROM_EMAIL || "Sharcly <onboarding@resend.dev>";
-const logoUrl = "https://cdn.mignite.app/ws/works_01KM0WR2ZSKYNHV0ZE2MPNM9EF/final-Logo-1--01KM5Y2NCW8720B30G9G0XW18Y.png";
+const fromEmail = process.env.RESEND_FROM_EMAIL ;
+const frontendUrl = (process.env.FRONTEND_URL || "https://sharcly.com").replace(/\/$/, "");
+const logoUrl = `${frontendUrl}/assets/final-Logo-1.png`;
 
 const baseTemplate = (title: string, content: string, cta?: { text: string; url: string }, footer?: string) => `
   <div style="font-family: 'Inter', sans-serif; background-color: #FDFDFB; padding: 40px 20px;">
@@ -35,7 +37,7 @@ const baseTemplate = (title: string, content: string, cta?: { text: string; url:
       ` : ""}
       
       <div style="margin-top: 40px; padding-top: 24px; border-top: 1px solid #eee; text-align: center;">
-        <p style="color: #999; font-size: 12px;">${footer || "© 2024 Sharcly Essentials. Pure. Lab Verified."}</p>
+        <p style="color: #999; font-size: 12px;">${footer || "© 2024 Sharcly Essentials. Pure. Third Party Lab Verified."}</p>
       </div>
     </div>
   </div>
@@ -46,7 +48,7 @@ export const sendVerificationEmail = async (email: string, token: string) => {
     console.error("❌ Resend client not initialized. Cannot send verification email to:", email);
     return;
   }
-  const verificationUrl = `${process.env.FRONTEND_URL}/verify-email?token=${token}`;
+  const verificationUrl = `${frontendUrl}/verify-email?token=${token}`;
   
   try {
     const { data, error } = await resend.emails.send({
@@ -56,7 +58,7 @@ export const sendVerificationEmail = async (email: string, token: string) => {
       html: baseTemplate(
         "Welcome to Sharcly!",
         "Thank you for joining us. Please verify your email address to get full access to your account and start shopping our premium collection.",
-        { text: "Verify Email Address", url: verificationUrl },
+    
         "If you didn't create an account, you can safely ignore this email."
       ),
     });
@@ -75,30 +77,66 @@ export const sendOrderConfirmation = async (email: string, orderDetails: any) =>
   if (!resend) return;
 
   try {
-    const invoiceBuffer = await InvoiceService.generateInvoiceBuffer(orderDetails);
+    const order = await prisma.order.findUnique({
+      where: { id: orderDetails.id },
+      include: {
+        user: { select: { name: true, email: true } },
+        items: { include: { product: true } }
+      }
+    });
+
+    if (!order) {
+      console.error(`❌ Order not found for confirmation email: ${orderDetails.id}`);
+      return;
+    }
+
+    const itemsHtml = order.items.map((item: any) => `
+      <div style="display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #eee;">
+        <div style="text-align: left;">
+          <p style="margin: 0; font-weight: 700; color: #062D1B; font-size: 14px;">${item.product?.name || "Product"}</p>
+          <p style="margin: 4px 0 0 0; color: #666; font-size: 12px;">Qty: ${item.quantity} x $${Number(item.price).toFixed(2)}</p>
+        </div>
+        <div style="font-weight: 700; color: #062D1B; font-size: 14px;">
+          $${(Number(item.price) * item.quantity).toFixed(2)}
+        </div>
+      </div>
+    `).join("");
+
+    const invoiceBuffer = await InvoiceService.generateInvoiceBuffer(order);
     
     await resend.emails.send({
       from: fromEmail,
       to: email,
-      subject: `Order Confirmation - #${orderDetails.id.slice(0, 8)}`,
+      subject: `Order Confirmation - #${order.id.slice(0, 8)}`,
       attachments: [
         {
-          filename: `invoice-${orderDetails.id.slice(0, 8)}.pdf`,
+          filename: `invoice-${order.id.slice(0, 8)}.pdf`,
           content: invoiceBuffer,
         },
       ],
       html: baseTemplate(
         "Thank you for your order!",
         `
-        <p>Your order <strong>#${orderDetails.id.slice(0, 8)}</strong> has been placed successfully.</p>
-        <div style="background: #f9f9f9; padding: 20px; border-radius: 16px; margin: 20px 0; text-align: left;">
-          <p style="margin: 5px 0;"><strong>Items:</strong> ${orderDetails.items.length}</p>
-          <p style="margin: 5px 0;"><strong>Total Amount:</strong> $${Number(orderDetails.totalAmount).toFixed(2)}</p>
-          <p style="margin: 5px 0;"><strong>Shipping To:</strong> ${orderDetails.address}</p>
+        <p>Your order <strong>#${order.id.slice(0, 8)}</strong> has been placed successfully.</p>
+        
+        <div style="background: #f9f9f9; padding: 24px; border-radius: 16px; margin: 24px 0;">
+          <h3 style="margin-top: 0; color: #062D1B; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid #ddd; padding-bottom: 8px;">Order Details</h3>
+          ${itemsHtml}
+          
+          <div style="margin-top: 16px; text-align: right;">
+            <p style="margin: 4px 0; font-size: 13px; color: #666;">Subtotal: $${(Number(order.totalAmount) - Number(order.taxAmount || 0) - Number(order.shippingAmount || 0)).toFixed(2)}</p>
+            ${Number(order.taxAmount) > 0 ? `<p style="margin: 4px 0; font-size: 13px; color: #666;">Tax: $${Number(order.taxAmount).toFixed(2)}</p>` : ""}
+            ${Number(order.shippingAmount) > 0 ? `<p style="margin: 4px 0; font-size: 13px; color: #666;">Shipping: $${Number(order.shippingAmount).toFixed(2)}</p>` : ""}
+            <p style="margin: 8px 0 0 0; font-weight: 800; font-size: 16px; color: #062D1B;">Total: $${Number(order.totalAmount).toFixed(2)}</p>
+          </div>
+        </div>
+
+        <div style="background: #f9f9f9; padding: 20px; border-radius: 16px; margin: 24px 0; text-align: left;">
+          <p style="margin: 4px 0; font-size: 14px; color: #062D1B;"><strong>Shipping To:</strong> ${order.address}</p>
         </div>
         <p>An invoice has been attached to this email for your records. We'll notify you as soon as your package ships!</p>
         `,
-        { text: "View Order Details", url: `${process.env.FRONTEND_URL}/account` }
+        { text: "View Order Details", url: `${frontendUrl}/account` }
       ),
     });
   } catch (error) {
@@ -106,21 +144,34 @@ export const sendOrderConfirmation = async (email: string, orderDetails: any) =>
   }
 };
 
-export const sendOrderStatusUpdate = async (email: string, order: any) => {
+export const sendOrderStatusUpdate = async (email: string, orderDetails: any) => {
   if (!resend) return;
 
-  // Delegate to specific functions for major status changes
-  if (order.status === "SHIPPED") {
-    return await sendShippingNotificationEmail(email, order);
-  }
-  if (order.status === "CANCELLED") {
-    return await sendOrderCancellationEmail(email, order, order.cancelReason || "Customer request");
-  }
-  if (order.status === "DELIVERED") {
-    return await sendOrderDeliveredEmail(email, order);
-  }
-
   try {
+    const order = await prisma.order.findUnique({
+      where: { id: orderDetails.id },
+      include: {
+        user: { select: { name: true, email: true } },
+        items: { include: { product: true } }
+      }
+    });
+
+    if (!order) {
+      console.error(`❌ Order not found for status update email: ${orderDetails.id}`);
+      return;
+    }
+
+    // Delegate to specific functions for major status changes
+    if (order.status === "SHIPPED") {
+      return await sendShippingNotificationEmail(email, order);
+    }
+    if (order.status === "CANCELLED") {
+      return await sendOrderCancellationEmail(email, order, order.cancelReason || "Customer request");
+    }
+    if (order.status === "DELIVERED") {
+      return await sendOrderDeliveredEmail(email, order);
+    }
+
     let attachments: any[] = [];
     let statusMessage = "We're working on your order.";
     let statusTitle = `Order Status: ${order.status}`;
@@ -152,7 +203,7 @@ export const sendOrderStatusUpdate = async (email: string, order: any) => {
         </div>
         <p style="text-align: center; color: #666;">${statusMessage}</p>
         `,
-        { text: "View Order Details", url: `${process.env.FRONTEND_URL}/account` }
+        { text: "View Order Details", url: `${frontendUrl}/account` }
       ),
     });
   } catch (error) {
@@ -183,7 +234,7 @@ export const sendShippingNotificationEmail = async (email: string, order: any) =
         </div>
         <p>You can track your package's progress by clicking the button below.</p>
         `,
-        { text: "Track Package", url: `${process.env.FRONTEND_URL}/account` }
+        { text: "Track Package", url: `${frontendUrl}/account` }
       ),
     });
   } catch (error) {
@@ -211,7 +262,7 @@ export const sendOrderCancellationEmail = async (email: string, order: any, reas
         </div>
         <p>If you have already been charged, a refund will be processed automatically within 5-10 business days. We apologize for any inconvenience.</p>
         `,
-        { text: "Visit Store", url: `${process.env.FRONTEND_URL}/products` }
+        { text: "Visit Store", url: `${frontendUrl}/products` }
       ),
     });
   } catch (error) {
@@ -237,7 +288,7 @@ export const sendOrderDeliveredEmail = async (email: string, order: any) => {
         <p>If you have any issues with your delivery or the products, please reply to this email or contact our support team.</p>
         <p><strong>Loved your experience?</strong> We'd love to hear your feedback.</p>
         `,
-        { text: "Write a Review", url: `${process.env.FRONTEND_URL}/products` }
+        { text: "Write a Review", url: `${frontendUrl}/products` }
       ),
     });
   } catch (error) {
@@ -247,7 +298,7 @@ export const sendOrderDeliveredEmail = async (email: string, order: any) => {
 
 export const sendPasswordResetEmail = async (email: string, token: string) => {
   if (!resend) return;
-  const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${token}`;
+  const resetUrl = `${frontendUrl}/reset-password?token=${token}`;
   
   await resend.emails.send({
     from: fromEmail,
@@ -281,7 +332,7 @@ export const sendWelcomeCoupon = async (email: string, couponCode: string, disco
         <p style="font-size: 14px; color: #062D1B; opacity: 0.6; margin-top: 10px;">Use this code for <strong>${discountDisplay} OFF</strong> your first order.</p>
       </div>
       `,
-      { text: "Shop Our Collection", url: `${process.env.FRONTEND_URL}/products` }
+      { text: "Shop Our Collection", url: `${frontendUrl}/products` }
     ),
   });
 };

@@ -126,7 +126,10 @@ export class ProductService {
   static async bulkUpdateProducts(productIds: string[], isPublished: boolean) {
     return await prisma.product.updateMany({
       where: { id: { in: productIds } },
-      data: { isPublished }
+      data: { 
+        isPublished,
+        status: isPublished ? "PUBLISHED" : "DRAFT"
+      }
     });
   }
 
@@ -163,6 +166,40 @@ export class ProductService {
   }
 
   static async deleteCategory(id: string) {
+    // 1. Check if the category has any products
+    const productsCount = await prisma.product.count({
+      where: { categoryId: id }
+    });
+
+    if (productsCount > 0) {
+      // Find or create a default "Uncategorized" category
+      let defaultCategory = await prisma.category.findFirst({
+        where: { slug: "uncategorized" }
+      });
+
+      if (!defaultCategory) {
+        defaultCategory = await prisma.category.create({
+          data: {
+            name: "Uncategorized",
+            slug: "uncategorized",
+            description: "Default category for migrated products"
+          }
+        });
+      }
+
+      // Prevent deleting the default uncategorized category itself
+      if (defaultCategory.id === id) {
+        throw new Error("Cannot delete the default Uncategorized category");
+      }
+
+      // Reassign products to the default category
+      await prisma.product.updateMany({
+        where: { categoryId: id },
+        data: { categoryId: defaultCategory.id }
+      });
+    }
+
+    // 2. Safely delete the category
     return await prisma.category.delete({ where: { id } });
   }
 

@@ -44,6 +44,10 @@ export class MarketingService {
   }
 
   static async deleteOffer(id: string) {
+    // Delete all claims associated with this welcome offer first to satisfy the FK constraint
+    await prisma.offerClaim.deleteMany({
+      where: { welcomeOfferId: id }
+    });
     return await prisma.welcomeOffer.delete({ where: { id } });
   }
 
