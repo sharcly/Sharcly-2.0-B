@@ -55,6 +55,7 @@ model User {
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
   stripeCustomerId  String?
+  cart              Json?
   addresses         Address[]
   blogs             Blog[]
   orders            Order[]
