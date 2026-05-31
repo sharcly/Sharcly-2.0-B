@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.createType = exports.getTypes = exports.createTag = exports.getTags = exports.deleteCollection = exports.updateCollection = exports.createCollection = exports.getCollectionBySlug = exports.getCollections = exports.deleteCategory = exports.updateCategory = exports.createCategory = exports.getCategories = exports.deleteProduct = exports.updateProduct = exports.createProduct = exports.getProductBySlug = exports.getProducts = void 0;
+exports.deleteFlavour = exports.createFlavour = exports.getFlavours = exports.createType = exports.getTypes = exports.createTag = exports.getTags = exports.deleteCollection = exports.updateCollection = exports.createCollection = exports.getCollectionBySlug = exports.getCollections = exports.deleteCategory = exports.updateCategory = exports.createCategory = exports.getCategories = exports.deleteProduct = exports.updateProduct = exports.createProduct = exports.getProductBySlug = exports.getProducts = void 0;
 const prisma_1 = require("../../common/lib/prisma");
 const product_service_1 = require("./product.service");
 const getProducts = async (req, res) => {
@@ -43,6 +43,7 @@ const getProducts = async (req, res) => {
                     category: true,
                     type: true,
                     tags: true,
+                    flavours: true,
                     variants: true,
                     images: {
                         orderBy: { order: "asc" },
@@ -82,6 +83,7 @@ const getProductBySlug = async (req, res) => {
             include: {
                 category: true,
                 variants: true,
+                flavours: true,
                 images: {
                     orderBy: { order: "asc" },
                     select: { id: true, isThumbnail: true, order: true, mimeType: true }
@@ -108,7 +110,7 @@ const getProductBySlug = async (req, res) => {
 exports.getProductBySlug = getProductBySlug;
 const createProduct = async (req, res) => {
     try {
-        const { name, subtitle, slug, sku, description, price, stock, categoryId, typeId, tags, collections, status, featured, isComingSoon, discountable, weight, length, height, width, originCountry, material, hsCode, midCode, metaTitle, metaDescription, keywords, canonicalUrl, ogImage, changefreq, options, metadata, variants, ingredients, testimonials, actualPrice } = req.body;
+        const { name, subtitle, slug, sku, description, price, stock, categoryId, typeId, tags, collections, status, featured, isComingSoon, discountable, weight, length, height, width, originCountry, material, hsCode, midCode, metaTitle, metaDescription, keywords, canonicalUrl, ogImage, changefreq, options, metadata, variants, ingredients, testimonials, actualPrice, flavours } = req.body;
         if (!categoryId) {
             return res.status(400).json({ message: "Category is required" });
         }
@@ -116,6 +118,10 @@ const createProduct = async (req, res) => {
         let tagsArray = [];
         if (tags) {
             tagsArray = Array.isArray(tags) ? tags : (typeof tags === "string" ? JSON.parse(tags) : []);
+        }
+        let flavoursArray = [];
+        if (flavours) {
+            flavoursArray = Array.isArray(flavours) ? flavours : (typeof flavours === "string" ? JSON.parse(flavours) : []);
         }
         const files = req.files || [];
         let processedImages = [];
@@ -215,6 +221,9 @@ const createProduct = async (req, res) => {
                         .filter((t) => typeof t === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i.test(t))
                         .map((id) => ({ id }))
                 } : undefined,
+                flavours: flavoursArray.length > 0 ? {
+                    connect: flavoursArray.map((id) => ({ id }))
+                } : undefined,
                 images: {
                     create: processedImages
                 },
@@ -235,7 +244,8 @@ const createProduct = async (req, res) => {
                 images: { select: { id: true, isThumbnail: true, order: true } },
                 variants: true,
                 type: true,
-                tags: true
+                tags: true,
+                flavours: true
             }
         });
         // Handle OG Image file specifically if it was a file
@@ -278,8 +288,9 @@ exports.createProduct = createProduct;
 const updateProduct = async (req, res) => {
     try {
         const { id } = req.params;
-        const { name, subtitle, slug, sku, description, price, stock, categoryId, typeId, tags, collections, status, featured, isComingSoon, discountable, weight, length, height, width, originCountry, material, hsCode, midCode, metaTitle, metaDescription, keywords, canonicalUrl, ogImage, changefreq, options, metadata, variants, ingredients, testimonials, actualPrice } = req.body;
+        const { name, subtitle, slug, sku, description, price, stock, categoryId, typeId, tags, collections, status, featured, isComingSoon, discountable, weight, length, height, width, originCountry, material, hsCode, midCode, metaTitle, metaDescription, keywords, canonicalUrl, ogImage, changefreq, options, metadata, variants, ingredients, testimonials, actualPrice, flavours } = req.body;
         const tagsArray = tags ? (Array.isArray(tags) ? tags : (typeof tags === "string" ? JSON.parse(tags) : [])) : undefined;
+        const flavoursArray = flavours ? (Array.isArray(flavours) ? flavours : (typeof flavours === "string" ? JSON.parse(flavours) : [])) : undefined;
         const variantData = variants ? (typeof variants === "string" ? JSON.parse(variants) : variants) : undefined;
         const optionsData = options ? (typeof options === "string" ? JSON.parse(options) : options) : undefined;
         const metadataData = metadata ? (typeof metadata === "string" ? JSON.parse(metadata) : metadata) : undefined;
@@ -358,6 +369,9 @@ const updateProduct = async (req, res) => {
                         .filter((t) => typeof t === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i.test(t))
                         .map((id) => ({ id }))
                 } : undefined,
+                flavours: flavoursArray ? {
+                    set: flavoursArray.map((id) => ({ id }))
+                } : undefined,
                 images: processedImages.length > 0 ? {
                     deleteMany: {}, // Optional: clear old images if new ones are uploaded
                     create: processedImages
@@ -379,7 +393,8 @@ const updateProduct = async (req, res) => {
                 images: { select: { id: true, isThumbnail: true, order: true } },
                 variants: true,
                 tags: true,
-                category: true
+                category: true,
+                flavours: true
             }
         });
         // Handle OG Image file update specifically
@@ -581,3 +596,45 @@ const createType = async (req, res) => {
     }
 };
 exports.createType = createType;
+const getFlavours = async (req, res) => {
+    try {
+        const flavours = await prisma_1.prisma.flavour.findMany({
+            orderBy: { name: "asc" }
+        });
+        res.status(200).json({ success: true, flavours });
+    }
+    catch (error) {
+        res.status(500).json({ message: "Failed to fetch flavours" });
+    }
+};
+exports.getFlavours = getFlavours;
+const createFlavour = async (req, res) => {
+    try {
+        const { name } = req.body;
+        if (!name) {
+            return res.status(400).json({ message: "Name is required" });
+        }
+        const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+        const flavour = await prisma_1.prisma.flavour.create({
+            data: { name, slug }
+        });
+        res.status(201).json({ success: true, flavour });
+    }
+    catch (error) {
+        res.status(500).json({ message: "Failed to create flavour", error: error.message });
+    }
+};
+exports.createFlavour = createFlavour;
+const deleteFlavour = async (req, res) => {
+    try {
+        const { id } = req.params;
+        await prisma_1.prisma.flavour.delete({
+            where: { id: id }
+        });
+        res.status(200).json({ success: true, message: "Flavour deleted" });
+    }
+    catch (error) {
+        res.status(500).json({ message: "Failed to delete flavour" });
+    }
+};
+exports.deleteFlavour = deleteFlavour;
