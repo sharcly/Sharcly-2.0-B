@@ -124,6 +124,12 @@ export const authorize = (...requiredPermissions: string[]) => {
       return next();
     }
 
+    // Support legacy role-based authorization fallback (e.g. authorize("admin", "manager"))
+    const hasRoleMatch = requiredPermissions.some(role => role.toLowerCase() === roleSlug);
+    if (hasRoleMatch) {
+      return next();
+    }
+
     const userPermissions = req.user.userRole?.permissions.map(p => p.permission.slug) || [];
     
     // Must have at least one required permission — empty authorize() now requires admin only

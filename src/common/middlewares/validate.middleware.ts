@@ -172,9 +172,22 @@ export const AdminCreateUserSchema = z.object({
 });
 
 export const AdminUpdateUserSchema = z.object({
-  email: z.email("Invalid email").toLowerCase().trim().optional(),
+  email: z.string().email("Invalid email").toLowerCase().trim().optional(),
   password: z.string().min(8, "Password must be at least 8 characters").max(72).optional(),
   name: z.string().min(2).max(100).trim().optional(),
   role: z.string().optional(),
   roleId: z.string().optional(),
+});
+
+// ─────────────────────────────────────────────────────
+// TESTIMONIAL SCHEMAS
+// ─────────────────────────────────────────────────────
+export const TestimonialSchema = z.object({
+  name: z.string().min(2, "Name must be at least 2 characters").max(100),
+  role: z.string().min(2, "Role must be at least 2 characters").max(100),
+  company: z.string().max(100).optional().nullable(),
+  message: z.string().min(10, "Message must be at least 10 characters"),
+  rating: z.number().int().min(1).max(5).optional().nullable(),
+  image: z.string().url().optional().nullable().or(z.string().length(0)),
+  featured: z.boolean().default(false),
 });
