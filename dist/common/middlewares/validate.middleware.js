@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.AdminUpdateUserSchema = exports.AdminCreateUserSchema = exports.CreateAddressSchema = exports.UpdateProductSchema = exports.CreateProductSchema = exports.CreateCouponSchema = exports.UpdateOrderStatusSchema = exports.CreateOrderSchema = exports.ChangePasswordSchema = exports.RegisterSchema = exports.LoginSchema = void 0;
+exports.TestimonialSchema = exports.AdminUpdateUserSchema = exports.AdminCreateUserSchema = exports.CreateAddressSchema = exports.UpdateProductSchema = exports.CreateProductSchema = exports.CreateCouponSchema = exports.UpdateOrderStatusSchema = exports.CreateOrderSchema = exports.ChangePasswordSchema = exports.RegisterSchema = exports.LoginSchema = void 0;
 exports.validate = validate;
 const zod_1 = require("zod");
 // ─────────────────────────────────────────────────────
@@ -154,9 +154,21 @@ exports.AdminCreateUserSchema = zod_1.z.object({
     roleId: zod_1.z.string().optional(),
 });
 exports.AdminUpdateUserSchema = zod_1.z.object({
-    email: zod_1.z.email("Invalid email").toLowerCase().trim().optional(),
+    email: zod_1.z.string().email("Invalid email").toLowerCase().trim().optional(),
     password: zod_1.z.string().min(8, "Password must be at least 8 characters").max(72).optional(),
     name: zod_1.z.string().min(2).max(100).trim().optional(),
     role: zod_1.z.string().optional(),
     roleId: zod_1.z.string().optional(),
+});
+// ─────────────────────────────────────────────────────
+// TESTIMONIAL SCHEMAS
+// ─────────────────────────────────────────────────────
+exports.TestimonialSchema = zod_1.z.object({
+    name: zod_1.z.string().min(2, "Name must be at least 2 characters").max(100),
+    role: zod_1.z.string().min(2, "Role must be at least 2 characters").max(100),
+    company: zod_1.z.string().max(100).optional().nullable(),
+    message: zod_1.z.string().min(10, "Message must be at least 10 characters"),
+    rating: zod_1.z.number().int().min(1).max(5).optional().nullable(),
+    image: zod_1.z.string().url().optional().nullable().or(zod_1.z.string().length(0)),
+    featured: zod_1.z.boolean().default(false),
 });

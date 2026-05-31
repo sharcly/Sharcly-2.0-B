@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.deleteFlavour = exports.createFlavour = exports.getFlavours = exports.createType = exports.getTypes = exports.createTag = exports.getTags = exports.deleteCollection = exports.updateCollection = exports.createCollection = exports.getCollectionBySlug = exports.getCollections = exports.deleteCategory = exports.updateCategory = exports.createCategory = exports.getCategories = exports.deleteProduct = exports.updateProduct = exports.createProduct = exports.getProductBySlug = exports.getProducts = void 0;
+exports.deleteFlavour = exports.createFlavour = exports.getFlavours = exports.createType = exports.getTypes = exports.createTag = exports.getTags = exports.deleteCollection = exports.updateCollection = exports.createCollection = exports.getCollectionBySlug = exports.getCollections = exports.deleteCategory = exports.updateCategory = exports.createCategory = exports.getCategories = exports.deleteProduct = exports.bulkUpdateProducts = exports.updateProduct = exports.createProduct = exports.getProductBySlug = exports.getProducts = void 0;
 const prisma_1 = require("../../common/lib/prisma");
 const product_service_1 = require("./product.service");
 const getProducts = async (req, res) => {
@@ -58,6 +58,7 @@ const getProducts = async (req, res) => {
             products: products.map(p => ({
                 ...p,
                 price: Number(p.price),
+                isPublished: p.status === "PUBLISHED",
                 variants: p.variants.map(v => ({ ...v, price: Number(v.price) })),
                 // Map images to internal API URLs
                 imageUrls: p.images.map(img => `/api/images/${img.id}`)
@@ -98,6 +99,7 @@ const getProductBySlug = async (req, res) => {
             product: {
                 ...product,
                 price: Number(product.price),
+                isPublished: product.status === "PUBLISHED",
                 variants: product.variants.map(v => ({ ...v, price: Number(v.price) })),
                 imageUrls: product.images.map(img => `/api/images/${img.id}`)
             }
@@ -270,6 +272,7 @@ const createProduct = async (req, res) => {
             product: {
                 ...product,
                 price: Number(product.price),
+                isPublished: product.status === "PUBLISHED",
                 variants: product.variants.map((v) => ({ ...v, price: Number(v.price) })),
                 imageUrls: product.images.map((img) => `/api/images/${img.id}`)
             }
@@ -418,6 +421,7 @@ const updateProduct = async (req, res) => {
             product: {
                 ...product,
                 price: Number(product.price),
+                isPublished: product.status === "PUBLISHED",
                 variants: product.variants.map((v) => ({ ...v, price: Number(v.price) })),
                 imageUrls: product.images.map((img) => `/api/images/${img.id}`)
             }
@@ -429,6 +433,36 @@ const updateProduct = async (req, res) => {
     }
 };
 exports.updateProduct = updateProduct;
+const bulkUpdateProducts = async (req, res) => {
+    try {
+        const { productIds, isPublished } = req.body;
+        if (!Array.isArray(productIds)) {
+            return res.status(400).json({ message: "productIds must be an array" });
+        }
+        if (isPublished === undefined) {
+            return res.status(400).json({ message: "isPublished is required" });
+        }
+        const status = isPublished ? "PUBLISHED" : "DRAFT";
+        const updateResult = await prisma_1.prisma.product.updateMany({
+            where: {
+                id: { in: productIds }
+            },
+            data: {
+                status
+            }
+        });
+        res.status(200).json({
+            success: true,
+            message: `Successfully updated ${updateResult.count} products to ${status.toLowerCase()}`,
+            count: updateResult.count
+        });
+    }
+    catch (error) {
+        console.error("Bulk update products error:", error);
+        res.status(500).json({ message: "Failed to perform bulk action", error: error.message });
+    }
+};
+exports.bulkUpdateProducts = bulkUpdateProducts;
 const deleteProduct = async (req, res) => {
     try {
         const { id } = req.params;

@@ -15,6 +15,8 @@ const settings_router_1 = __importDefault(require("../modules/settings/settings.
 const image_router_1 = __importDefault(require("../modules/image/image.router"));
 const cms_router_1 = __importDefault(require("../modules/cms/cms.router"));
 const seo_router_1 = __importDefault(require("../modules/seo/seo.router"));
+const testimonial_router_1 = __importDefault(require("../modules/testimonial/testimonial.router"));
+const faq_router_1 = __importDefault(require("../modules/faq/faq.router"));
 const shipping_router_1 = __importDefault(require("../modules/shipping/shipping.router"));
 const wholesale_router_1 = __importDefault(require("../modules/wholesale/wholesale.router"));
 const search_router_1 = __importDefault(require("../modules/search/search.router"));
@@ -32,6 +34,8 @@ router.use("/settings", settings_router_1.default);
 router.use("/images", image_router_1.default);
 router.use("/cms", cms_router_1.default);
 router.use("/seo", seo_router_1.default);
+router.use("/testimonials", testimonial_router_1.default);
+router.use("/faqs", faq_router_1.default);
 router.use("/shipping", shipping_router_1.default);
 router.use("/wholesale", wholesale_router_1.default);
 router.use("/search", search_router_1.default);

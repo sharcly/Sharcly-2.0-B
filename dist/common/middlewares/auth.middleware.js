@@ -88,8 +88,14 @@ const authorize = (...requiredPermissions) => {
         if (!req.user) {
             return res.status(401).json({ message: "Authentication required" });
         }
-        // Admin superuser check - if role slug is 'admin', grant all
-        if (req.user.userRole?.slug === 'admin') {
+        // Admin superuser check - if role slug is 'admin', 'Admin', or 'super_admin', grant all
+        const roleSlug = req.user.userRole?.slug?.toLowerCase().trim();
+        if (roleSlug === 'admin' || roleSlug === 'super_admin') {
+            return next();
+        }
+        // Support legacy role-based authorization fallback (e.g. authorize("admin", "manager"))
+        const hasRoleMatch = requiredPermissions.some(role => role.toLowerCase() === roleSlug);
+        if (hasRoleMatch) {
             return next();
         }
         const userPermissions = req.user.userRole?.permissions.map(p => p.permission.slug) || [];

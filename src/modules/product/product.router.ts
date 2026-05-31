@@ -4,6 +4,7 @@ import {
   createProduct,
   getProductBySlug,
   updateProduct, 
+  bulkUpdateProducts,
   deleteProduct,
   getCategories,
   createCategory,
@@ -126,6 +127,7 @@ router.post("/", authenticate, authorize("products.create"), upload.any(), valid
  *       200:
  *         description: Product updated successfully
  */
+router.patch("/bulk", authenticate, authorize("products.update"), bulkUpdateProducts);
 router.patch("/:id", authenticate, authorize("products.update"), upload.any(), validate(UpdateProductSchema), updateProduct);
 
 /**
