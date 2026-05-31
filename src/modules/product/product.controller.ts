@@ -5,6 +5,8 @@ import { ProductService } from "./product.service";
 export const getProducts = async (req: Request, res: Response) => {
   try {
     const { category, search, sort, page = "1", limit = "10" } = req.query;
+    const featured = req.query.featured;
+    const isComingSoonQuery = req.query.isComingSoon;
 
     const pageNum = parseInt(page as string);
     const limitNum = parseInt(limit as string);
@@ -16,6 +18,10 @@ export const getProducts = async (req: Request, res: Response) => {
       { name: { contains: search as string, mode: "insensitive" } },
       { description: { contains: search as string, mode: "insensitive" } }
     ];
+    if (featured === "true") where.featured = true;
+    if (featured === "false") where.featured = false;
+    if (isComingSoonQuery === "true") where.isComingSoon = true;
+    if (isComingSoonQuery === "false") where.isComingSoon = false;
 
     if (req.query.minPrice || req.query.maxPrice) {
       where.price = {};
@@ -99,9 +105,9 @@ export const createProduct = async (req: Request, res: Response) => {
   try {
     const {
       name, subtitle, slug, sku, description, price, stock, categoryId, typeId, tags, collections,
-      status, discountable, weight, length, height, width, originCountry, material, hsCode, midCode,
+      status, featured, isComingSoon, discountable, weight, length, height, width, originCountry, material, hsCode, midCode,
       metaTitle, metaDescription, keywords, canonicalUrl, ogImage, changefreq,
-      options, metadata, variants
+      options, metadata, variants, ingredients, testimonials, actualPrice
     } = req.body;
 
     if (!categoryId) {
@@ -206,6 +212,11 @@ export const createProduct = async (req: Request, res: Response) => {
         keywords: Array.isArray(keywordsData) ? keywordsData.join(", ") : keywordsData,
         canonicalUrl,
         ogImage: ogImage, // Start with body value
+        featured: featured === "true" || featured === true,
+        isComingSoon: isComingSoon === "true" || isComingSoon === true,
+        actualPrice: (actualPrice !== undefined && actualPrice !== "") ? parseFloat(actualPrice as string) : null,
+        ingredients: ingredients || null,
+        testimonials: testimonials ? (typeof testimonials === "string" ? JSON.parse(testimonials) : testimonials) : null,
         changefreq: changefreq || "monthly",
         options: optionsData,
         metadata: metadataData,
@@ -285,9 +296,9 @@ export const updateProduct = async (req: Request, res: Response) => {
     const { id } = req.params;
     const {
       name, subtitle, slug, sku, description, price, stock, categoryId, typeId, tags, collections,
-      status, discountable, weight, length, height, width, originCountry, material, hsCode, midCode,
+      status, featured, isComingSoon, discountable, weight, length, height, width, originCountry, material, hsCode, midCode,
       metaTitle, metaDescription, keywords, canonicalUrl, ogImage, changefreq,
-      options, metadata, variants
+      options, metadata, variants, ingredients, testimonials, actualPrice
     } = req.body;
 
     const tagsArray = tags ? (Array.isArray(tags) ? tags : (typeof tags === "string" ? JSON.parse(tags) : [])) : undefined;
@@ -359,6 +370,11 @@ export const updateProduct = async (req: Request, res: Response) => {
         keywords: Array.isArray(keywords) ? keywords.join(", ") : keywords,
         canonicalUrl,
         ogImage: typeof ogImage === 'string' ? ogImage : undefined,
+        featured: featured !== undefined ? (featured === "true" || featured === true) : undefined,
+        isComingSoon: isComingSoon !== undefined ? (isComingSoon === "true" || isComingSoon === true) : undefined,
+        actualPrice: actualPrice !== undefined && actualPrice !== "" ? parseFloat(actualPrice as string) : undefined,
+        ingredients: ingredients !== undefined ? ingredients : undefined,
+        testimonials: testimonials ? (typeof testimonials === "string" ? JSON.parse(testimonials) : testimonials) : undefined,
         changefreq,
         options: optionsData,
         metadata: metadataData,

@@ -133,6 +133,7 @@ model Product {
   actualPrice     Decimal?
   ingredients     String?
   testimonials    Json?
+  isComingSoon    Boolean          @default(false)
   tags            ProductTag[]     @relation("ProductToTag")
   orderItems      OrderItem[]
   images          ProductImage[]
