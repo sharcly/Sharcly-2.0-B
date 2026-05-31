@@ -105,7 +105,7 @@ export class SeoService {
     let settings = await prisma.globalSeoSettings.findFirst();
     if (!settings) {
       settings = await prisma.globalSeoSettings.create({
-        data: { siteName: "Scarly 2.0" }
+        data: { name: "Sharcly" }
       });
     }
     return settings;

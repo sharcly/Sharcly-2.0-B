@@ -6,6 +6,8 @@ const product_service_1 = require("./product.service");
 const getProducts = async (req, res) => {
     try {
         const { category, search, sort, page = "1", limit = "10" } = req.query;
+        const featured = req.query.featured;
+        const isComingSoonQuery = req.query.isComingSoon;
         const pageNum = parseInt(page);
         const limitNum = parseInt(limit);
         const skip = (pageNum - 1) * limitNum;
@@ -17,6 +19,21 @@ const getProducts = async (req, res) => {
                 { name: { contains: search, mode: "insensitive" } },
                 { description: { contains: search, mode: "insensitive" } }
             ];
+        if (featured === "true")
+            where.featured = true;
+        if (featured === "false")
+            where.featured = false;
+        if (isComingSoonQuery === "true")
+            where.isComingSoon = true;
+        if (isComingSoonQuery === "false")
+            where.isComingSoon = false;
+        if (req.query.minPrice || req.query.maxPrice) {
+            where.price = {};
+            if (req.query.minPrice)
+                where.price.gte = parseFloat(req.query.minPrice);
+            if (req.query.maxPrice)
+                where.price.lte = parseFloat(req.query.maxPrice);
+        }
         const [products, total] = await Promise.all([
             prisma_1.prisma.product.findMany({
                 where,
@@ -91,7 +108,7 @@ const getProductBySlug = async (req, res) => {
 exports.getProductBySlug = getProductBySlug;
 const createProduct = async (req, res) => {
     try {
-        const { name, subtitle, slug, sku, description, price, stock, categoryId, typeId, tags, collections, status, discountable, weight, length, height, width, originCountry, material, hsCode, midCode, metaTitle, metaDescription, keywords, canonicalUrl, ogImage, changefreq, options, metadata, variants } = req.body;
+        const { name, subtitle, slug, sku, description, price, stock, categoryId, typeId, tags, collections, status, featured, isComingSoon, discountable, weight, length, height, width, originCountry, material, hsCode, midCode, metaTitle, metaDescription, keywords, canonicalUrl, ogImage, changefreq, options, metadata, variants, ingredients, testimonials, actualPrice } = req.body;
         if (!categoryId) {
             return res.status(400).json({ message: "Category is required" });
         }
@@ -181,6 +198,11 @@ const createProduct = async (req, res) => {
                 keywords: Array.isArray(keywordsData) ? keywordsData.join(", ") : keywordsData,
                 canonicalUrl,
                 ogImage: ogImage, // Start with body value
+                featured: featured === "true" || featured === true,
+                isComingSoon: isComingSoon === "true" || isComingSoon === true,
+                actualPrice: (actualPrice !== undefined && actualPrice !== "") ? parseFloat(actualPrice) : null,
+                ingredients: ingredients || null,
+                testimonials: testimonials ? (typeof testimonials === "string" ? JSON.parse(testimonials) : testimonials) : null,
                 changefreq: changefreq || "monthly",
                 options: optionsData,
                 metadata: metadataData,
@@ -256,7 +278,7 @@ exports.createProduct = createProduct;
 const updateProduct = async (req, res) => {
     try {
         const { id } = req.params;
-        const { name, subtitle, slug, sku, description, price, stock, categoryId, typeId, tags, collections, status, discountable, weight, length, height, width, originCountry, material, hsCode, midCode, metaTitle, metaDescription, keywords, canonicalUrl, ogImage, changefreq, options, metadata, variants } = req.body;
+        const { name, subtitle, slug, sku, description, price, stock, categoryId, typeId, tags, collections, status, featured, isComingSoon, discountable, weight, length, height, width, originCountry, material, hsCode, midCode, metaTitle, metaDescription, keywords, canonicalUrl, ogImage, changefreq, options, metadata, variants, ingredients, testimonials, actualPrice } = req.body;
         const tagsArray = tags ? (Array.isArray(tags) ? tags : (typeof tags === "string" ? JSON.parse(tags) : [])) : undefined;
         const variantData = variants ? (typeof variants === "string" ? JSON.parse(variants) : variants) : undefined;
         const optionsData = options ? (typeof options === "string" ? JSON.parse(options) : options) : undefined;
@@ -319,6 +341,11 @@ const updateProduct = async (req, res) => {
                 keywords: Array.isArray(keywords) ? keywords.join(", ") : keywords,
                 canonicalUrl,
                 ogImage: typeof ogImage === 'string' ? ogImage : undefined,
+                featured: featured !== undefined ? (featured === "true" || featured === true) : undefined,
+                isComingSoon: isComingSoon !== undefined ? (isComingSoon === "true" || isComingSoon === true) : undefined,
+                actualPrice: actualPrice !== undefined && actualPrice !== "" ? parseFloat(actualPrice) : undefined,
+                ingredients: ingredients !== undefined ? ingredients : undefined,
+                testimonials: testimonials ? (typeof testimonials === "string" ? JSON.parse(testimonials) : testimonials) : undefined,
                 changefreq,
                 options: optionsData,
                 metadata: metadataData,
