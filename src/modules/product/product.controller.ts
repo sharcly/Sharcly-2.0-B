@@ -615,7 +615,10 @@ export const createType = async (req: Request, res: Response) => {
 export const getFlavours = async (req: Request, res: Response) => {
   try {
     const flavours = await prisma.flavour.findMany({
-      orderBy: { name: "asc" }
+      orderBy: { name: "asc" },
+      include: {
+        _count: { select: { products: true } }
+      }
     });
     res.status(200).json({ success: true, flavours });
   } catch (error) {
