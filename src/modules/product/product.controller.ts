@@ -686,3 +686,48 @@ export const deleteFlavour = async (req: Request, res: Response) => {
     res.status(500).json({ message: "Failed to delete flavour" });
   }
 };
+
+export const getRecommendations = async (req: Request, res: Response) => {
+  try {
+    const { limit = "3", exclude = "" } = req.query;
+    
+    const limitNum = parseInt(limit as string) || 3;
+    const excludeIds = (exclude as string)
+      .split(",")
+      .map(id => id.trim())
+      .filter(id => id !== "");
+
+    const products = await prisma.product.findMany({
+      where: {
+        status: "PUBLISHED",
+        id: {
+          notIn: excludeIds
+        }
+      },
+      take: limitNum,
+      include: {
+        images: {
+          orderBy: { order: "asc" },
+          select: { id: true }
+        }
+      }
+    });
+
+    const recommendations = products.map(p => ({
+      id: p.id,
+      name: p.name,
+      price: Number(p.price),
+      slug: p.slug,
+      image: p.images[0]?.id || null
+    }));
+
+    res.status(200).json({
+      success: true,
+      recommendations
+    });
+  } catch (error: any) {
+    console.error("Get recommendations error:", error);
+    res.status(500).json({ message: "Failed to fetch recommendations", error: error.message });
+  }
+};
+

@@ -49,6 +49,7 @@ router.get("/collections", product_controller_1.getCollections);
 router.get("/tags", product_controller_1.getTags);
 router.get("/types", product_controller_1.getTypes);
 router.get("/flavours", product_controller_1.getFlavours);
+router.get("/recommendations", product_controller_1.getRecommendations);
 router.get("/:slug", product_controller_1.getProductBySlug);
 /**
  * @swagger

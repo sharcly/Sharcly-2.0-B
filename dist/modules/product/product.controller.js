@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.deleteFlavour = exports.createFlavour = exports.getFlavours = exports.createType = exports.getTypes = exports.createTag = exports.getTags = exports.deleteCollection = exports.updateCollection = exports.createCollection = exports.getCollectionBySlug = exports.getCollections = exports.deleteCategory = exports.updateCategory = exports.createCategory = exports.getCategories = exports.deleteProduct = exports.bulkUpdateProducts = exports.updateProduct = exports.createProduct = exports.getProductBySlug = exports.getProducts = void 0;
+exports.getRecommendations = exports.deleteFlavour = exports.createFlavour = exports.getFlavours = exports.createType = exports.getTypes = exports.createTag = exports.getTags = exports.deleteCollection = exports.updateCollection = exports.createCollection = exports.getCollectionBySlug = exports.getCollections = exports.deleteCategory = exports.updateCategory = exports.createCategory = exports.getCategories = exports.deleteProduct = exports.bulkUpdateProducts = exports.updateProduct = exports.createProduct = exports.getProductBySlug = exports.getProducts = void 0;
 const prisma_1 = require("../../common/lib/prisma");
 const product_service_1 = require("./product.service");
 const getProducts = async (req, res) => {
@@ -672,3 +672,44 @@ const deleteFlavour = async (req, res) => {
     }
 };
 exports.deleteFlavour = deleteFlavour;
+const getRecommendations = async (req, res) => {
+    try {
+        const { limit = "3", exclude = "" } = req.query;
+        const limitNum = parseInt(limit) || 3;
+        const excludeIds = exclude
+            .split(",")
+            .map(id => id.trim())
+            .filter(id => id !== "");
+        const products = await prisma_1.prisma.product.findMany({
+            where: {
+                status: "PUBLISHED",
+                id: {
+                    notIn: excludeIds
+                }
+            },
+            take: limitNum,
+            include: {
+                images: {
+                    orderBy: { order: "asc" },
+                    select: { id: true }
+                }
+            }
+        });
+        const recommendations = products.map(p => ({
+            id: p.id,
+            name: p.name,
+            price: Number(p.price),
+            slug: p.slug,
+            image: p.images[0]?.id || null
+        }));
+        res.status(200).json({
+            success: true,
+            recommendations
+        });
+    }
+    catch (error) {
+        console.error("Get recommendations error:", error);
+        res.status(500).json({ message: "Failed to fetch recommendations", error: error.message });
+    }
+};
+exports.getRecommendations = getRecommendations;

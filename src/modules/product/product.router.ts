@@ -3,6 +3,7 @@ import {
   getProducts,
   createProduct,
   getProductBySlug,
+  getRecommendations,
   updateProduct, 
   bulkUpdateProducts,
   deleteProduct,
@@ -74,6 +75,7 @@ router.get("/collections", getCollections);
 router.get("/tags", getTags);
 router.get("/types", getTypes);
 router.get("/flavours", getFlavours);
+router.get("/recommendations", getRecommendations);
 router.get("/:slug", getProductBySlug);
 
 /**
