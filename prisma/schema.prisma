@@ -654,3 +654,25 @@ enum BlogStatus {
   PUBLISHED
   SCHEDULED
 }
+
+model CmsImage {
+  id        String   @id @default(uuid())
+  data      Bytes
+  mimeType  String
+  createdAt DateTime @default(now())
+
+  @@map("cms_images")
+}
+
+model CmsVideo {
+  id        String   @id @default(uuid())
+  data      Bytes
+  mimeType  String
+  purpose   String   @default("hero")
+  fileName  String?
+  fileSize  Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("cms_videos")
+}

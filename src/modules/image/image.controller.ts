@@ -14,9 +14,21 @@ export const getImage = async (req: Request, res: Response) => {
       return res.status(400).json({ message: "Invalid image ID format" });
     }
 
-    const image = await prisma.productImage.findUnique({
+    let image = await prisma.productImage.findUnique({
       where: { id: id as string }
-    });
+    }) as any;
+
+    if (!image || !image.data) {
+      const cmsImg = await prisma.cmsImage.findUnique({
+        where: { id: id as string }
+      });
+      if (cmsImg) {
+        image = {
+          data: cmsImg.data,
+          mimeType: cmsImg.mimeType
+        };
+      }
+    }
 
     if (!image || !image.data) {
       return res.status(404).json({ message: "Image not found" });
