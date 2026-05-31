@@ -38,6 +38,7 @@ export const getProducts = async (req: Request, res: Response) => {
           category: true,
           type: true,
           tags: true,
+          flavours: true,
           variants: true,
           images: {
             orderBy: { order: "asc" },
@@ -77,6 +78,7 @@ export const getProductBySlug = async (req: Request, res: Response) => {
       include: {
         category: true,
         variants: true,
+        flavours: true,
         images: {
           orderBy: { order: "asc" },
           select: { id: true, isThumbnail: true, order: true, mimeType: true }
@@ -107,7 +109,7 @@ export const createProduct = async (req: Request, res: Response) => {
       name, subtitle, slug, sku, description, price, stock, categoryId, typeId, tags, collections,
       status, featured, isComingSoon, discountable, weight, length, height, width, originCountry, material, hsCode, midCode,
       metaTitle, metaDescription, keywords, canonicalUrl, ogImage, changefreq,
-      options, metadata, variants, ingredients, testimonials, actualPrice
+      options, metadata, variants, ingredients, testimonials, actualPrice, flavours
     } = req.body;
 
     if (!categoryId) {
@@ -119,6 +121,11 @@ export const createProduct = async (req: Request, res: Response) => {
     let tagsArray = [];
     if (tags) {
       tagsArray = Array.isArray(tags) ? tags : (typeof tags === "string" ? JSON.parse(tags) : []);
+    }
+
+    let flavoursArray = [];
+    if (flavours) {
+      flavoursArray = Array.isArray(flavours) ? flavours : (typeof flavours === "string" ? JSON.parse(flavours) : []);
     }
 
     const files = (req.files as any[]) || [];
@@ -229,6 +236,9 @@ export const createProduct = async (req: Request, res: Response) => {
             .filter((t: any) => typeof t === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i.test(t))
             .map((id: string) => ({ id }))
         } : undefined,
+        flavours: flavoursArray.length > 0 ? {
+          connect: flavoursArray.map((id: string) => ({ id }))
+        } : undefined,
         images: {
           create: processedImages
         },
@@ -249,7 +259,8 @@ export const createProduct = async (req: Request, res: Response) => {
         images: { select: { id: true, isThumbnail: true, order: true } },
         variants: true,
         type: true,
-        tags: true
+        tags: true,
+        flavours: true
       }
     });
 
@@ -298,10 +309,11 @@ export const updateProduct = async (req: Request, res: Response) => {
       name, subtitle, slug, sku, description, price, stock, categoryId, typeId, tags, collections,
       status, featured, isComingSoon, discountable, weight, length, height, width, originCountry, material, hsCode, midCode,
       metaTitle, metaDescription, keywords, canonicalUrl, ogImage, changefreq,
-      options, metadata, variants, ingredients, testimonials, actualPrice
+      options, metadata, variants, ingredients, testimonials, actualPrice, flavours
     } = req.body;
 
     const tagsArray = tags ? (Array.isArray(tags) ? tags : (typeof tags === "string" ? JSON.parse(tags) : [])) : undefined;
+    const flavoursArray = flavours ? (Array.isArray(flavours) ? flavours : (typeof flavours === "string" ? JSON.parse(flavours) : [])) : undefined;
     const variantData = variants ? (typeof variants === "string" ? JSON.parse(variants) : variants) : undefined;
     const optionsData = options ? (typeof options === "string" ? JSON.parse(options) : options) : undefined;
     const metadataData = metadata ? (typeof metadata === "string" ? JSON.parse(metadata) : metadata) : undefined;
@@ -387,6 +399,9 @@ export const updateProduct = async (req: Request, res: Response) => {
             .filter((t: any) => typeof t === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i.test(t))
             .map((id: string) => ({ id }))
         } : undefined,
+        flavours: flavoursArray ? {
+          set: flavoursArray.map((id: string) => ({ id }))
+        } : undefined,
         images: processedImages.length > 0 ? {
           deleteMany: {}, // Optional: clear old images if new ones are uploaded
           create: processedImages
@@ -408,7 +423,8 @@ export const updateProduct = async (req: Request, res: Response) => {
         images: { select: { id: true, isThumbnail: true, order: true } },
         variants: true,
         tags: true,
-        category: true
+        category: true,
+        flavours: true
       }
     });
 
@@ -593,5 +609,44 @@ export const createType = async (req: Request, res: Response) => {
     res.status(201).json({ success: true, type });
   } catch (error) {
     res.status(500).json({ message: "Failed to create type" });
+  }
+};
+
+export const getFlavours = async (req: Request, res: Response) => {
+  try {
+    const flavours = await prisma.flavour.findMany({
+      orderBy: { name: "asc" }
+    });
+    res.status(200).json({ success: true, flavours });
+  } catch (error) {
+    res.status(500).json({ message: "Failed to fetch flavours" });
+  }
+};
+
+export const createFlavour = async (req: Request, res: Response) => {
+  try {
+    const { name } = req.body;
+    if (!name) {
+      return res.status(400).json({ message: "Name is required" });
+    }
+    const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+    const flavour = await prisma.flavour.create({
+      data: { name, slug }
+    });
+    res.status(201).json({ success: true, flavour });
+  } catch (error: any) {
+    res.status(500).json({ message: "Failed to create flavour", error: error.message });
+  }
+};
+
+export const deleteFlavour = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    await prisma.flavour.delete({
+      where: { id: id as string }
+    });
+    res.status(200).json({ success: true, message: "Flavour deleted" });
+  } catch (error) {
+    res.status(500).json({ message: "Failed to delete flavour" });
   }
 };
