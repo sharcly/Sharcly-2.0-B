@@ -255,12 +255,54 @@ export const testCredentials = async (req: Request, res: Response) => {
  */
 export const getActiveKey = async (req: Request, res: Response) => {
   try {
-    const data = await PaymentService.getActiveGatewayForCheckout();
-    res.json({ success: true, ...data });
+    // Fetch ALL enabled gateways so checkout can show them all
+    const configs = await prisma.paymentProviderConfig.findMany({
+      where: { enabled: true },
+      orderBy: { createdAt: "asc" },
+    });
+
+    const activeGateways = configs.map((g) => {
+      let publishableKey = "";
+      try {
+        const creds = JSON.parse(decrypt(g.encryptedCredentials));
+        publishableKey =
+          creds.publishableKey ||
+          creds.applicationId ||
+          creds.clientId ||
+          creds.keyId ||
+          "";
+      } catch {}
+      return {
+        id: g.id,
+        name: g.name,
+        provider: g.provider,
+        publishableKey,
+      };
+    });
+
+    // Primary gateway = first enabled one (used for initial Stripe mount)
+    const primary = activeGateways[0] || {
+      id: "env-fallback",
+      name: "Stripe",
+      provider: "stripe",
+      publishableKey:
+        process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ||
+        process.env.STRIPE_PUBLISHABLE_KEY ||
+        "",
+    };
+
+    res.json({
+      success: true,
+      publishableKey: primary.publishableKey,
+      gatewayId: primary.id,
+      gatewayName: primary.provider,
+      activeGateways, // ← full list for checkout selector
+    });
   } catch (err: any) {
     res.status(500).json({ success: false, message: err.message });
   }
 };
+
 
 /**
  * GET /api/payments/audit-logs
