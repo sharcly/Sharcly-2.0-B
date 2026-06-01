@@ -27,6 +27,10 @@ const getProducts = async (req, res) => {
             where.isComingSoon = true;
         if (isComingSoonQuery === "false")
             where.isComingSoon = false;
+        const flavour = req.query.flavour;
+        if (flavour) {
+            where.flavours = { some: { slug: flavour } };
+        }
         if (req.query.minPrice || req.query.maxPrice) {
             where.price = {};
             if (req.query.minPrice)
