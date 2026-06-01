@@ -1,6 +1,5 @@
 import { Request, Response } from 'express';
 import { prisma } from '../../common/lib/prisma';
-import fetch from 'node-fetch';
 
 export const connectStripe = async (req: Request, res: Response) => {
   const code = req.query.token as string;
