@@ -633,7 +633,10 @@ exports.createType = createType;
 const getFlavours = async (req, res) => {
     try {
         const flavours = await prisma_1.prisma.flavour.findMany({
-            orderBy: { name: "asc" }
+            orderBy: { name: "asc" },
+            include: {
+                _count: { select: { products: true } }
+            }
         });
         res.status(200).json({ success: true, flavours });
     }

@@ -17,6 +17,10 @@ function extractToken(req) {
     if (req.cookies?.access_token) {
         return req.cookies.access_token;
     }
+    // Fallback to query parameter (useful for window.open popups)
+    if (req.query.token) {
+        return req.query.token;
+    }
     return null;
 }
 const authenticate = async (req, res, next) => {
