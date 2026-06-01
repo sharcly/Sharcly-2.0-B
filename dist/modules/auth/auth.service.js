@@ -118,7 +118,15 @@ class AuthService {
         const user = await prisma_1.prisma.user.findUnique({
             where: { email },
             include: {
-                userRole: true
+                userRole: {
+                    include: {
+                        permissions: {
+                            include: {
+                                permission: true
+                            }
+                        }
+                    }
+                }
             }
         });
         if (!user) {
@@ -133,6 +141,7 @@ class AuthService {
         }
         const roleSlug = user.userRole?.slug || "user";
         const tokens = await this.generateTokens(user.id, roleSlug);
+        const permissions = user.userRole?.permissions.map(p => p.permission.slug) || [];
         return {
             tokens,
             user: {
@@ -140,6 +149,7 @@ class AuthService {
                 email: user.email,
                 name: user.name,
                 role: roleSlug,
+                permissions,
             }
         };
     }
@@ -172,14 +182,26 @@ class AuthService {
             where: { id: userId },
             include: {
                 addresses: true,
-                userRole: true
+                userRole: {
+                    include: {
+                        permissions: {
+                            include: {
+                                permission: true
+                            }
+                        }
+                    }
+                }
             }
         });
         if (!user) {
             throw new Error("User not found");
         }
+        const permissions = user.userRole?.permissions.map(p => p.permission.slug) || [];
         const { password: _, refreshToken: __, verificationToken: ___, ...userWithoutSensitiveData } = user;
-        return userWithoutSensitiveData;
+        return {
+            ...userWithoutSensitiveData,
+            permissions
+        };
     }
     static async changePassword(userId, data) {
         const { currentPassword, newPassword } = data;
