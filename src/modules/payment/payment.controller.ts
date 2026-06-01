@@ -16,7 +16,20 @@ const SUPPORTED_GATEWAYS = [
 export const getActiveKey = async (req: Request, res: Response) => {
   try {
     const data = await PaymentService.getActiveGatewayForCheckout();
-    res.status(200).json({ success: true, ...data });
+    const activeGateways = await prisma.paymentGateway.findMany({
+      where: { isActive: true },
+      orderBy: { createdAt: "asc" }
+    });
+    res.status(200).json({ 
+      success: true, 
+      ...data,
+      activeGateways: activeGateways.map(g => ({
+        id: g.id,
+        name: g.name,
+        provider: g.provider,
+        publishableKey: g.publishableKey
+      }))
+    });
   } catch (error: any) {
     res.status(500).json({ success: false, message: error.message });
   }

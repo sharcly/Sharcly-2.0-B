@@ -33,7 +33,9 @@ export class StripeProvider implements PaymentProviderInterface {
       where: { gatewayName: "stripe" },
       update: {
         userId,
-        authType: "credentials",
+        authType: data.authType || "credentials",
+        accessToken: data.accessToken ? encrypt(data.accessToken) : null,
+        refreshToken: data.refreshToken ? encrypt(data.refreshToken) : null,
         encryptedCredentials: encrypt(credentialsStr),
         status: "CONNECTED",
         lastSyncAt: new Date()
@@ -41,7 +43,9 @@ export class StripeProvider implements PaymentProviderInterface {
       create: {
         userId,
         gatewayName: "stripe",
-        authType: "credentials",
+        authType: data.authType || "credentials",
+        accessToken: data.accessToken ? encrypt(data.accessToken) : null,
+        refreshToken: data.refreshToken ? encrypt(data.refreshToken) : null,
         encryptedCredentials: encrypt(credentialsStr),
         status: "CONNECTED",
         lastSyncAt: new Date()

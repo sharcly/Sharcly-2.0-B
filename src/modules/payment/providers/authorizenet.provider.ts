@@ -14,7 +14,9 @@ export class AuthorizeNetProvider implements PaymentProviderInterface {
       where: { gatewayName: "authorizenet" },
       update: {
         userId,
-        authType: "credentials",
+        authType: data.authType || "credentials",
+        accessToken: data.accessToken ? encrypt(data.accessToken) : null,
+        refreshToken: data.refreshToken ? encrypt(data.refreshToken) : null,
         encryptedCredentials: encrypt(credentialsStr),
         status: "CONNECTED",
         lastSyncAt: new Date()
@@ -22,7 +24,9 @@ export class AuthorizeNetProvider implements PaymentProviderInterface {
       create: {
         userId,
         gatewayName: "authorizenet",
-        authType: "credentials",
+        authType: data.authType || "credentials",
+        accessToken: data.accessToken ? encrypt(data.accessToken) : null,
+        refreshToken: data.refreshToken ? encrypt(data.refreshToken) : null,
         encryptedCredentials: encrypt(credentialsStr),
         status: "CONNECTED",
         lastSyncAt: new Date()

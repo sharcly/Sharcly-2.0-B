@@ -21,12 +21,28 @@ export const createOrder = async (req: any, res: Response) => {
 
     // Dynamic rotation and payment authorization for online card payments
     if (orderData.paymentMethod === "online") {
-      const activeGateway = await PaymentService.getActiveGatewayForCheckout();
+      let activeGateway;
+      if (orderData.gatewayId) {
+        const gw = await prisma.paymentGateway.findFirst({
+          where: { id: orderData.gatewayId, isActive: true }
+        });
+        if (gw) {
+          activeGateway = {
+            publishableKey: gw.publishableKey || "",
+            gatewayId: gw.id,
+            gatewayName: gw.provider
+          };
+        }
+      }
+
+      if (!activeGateway) {
+        activeGateway = await PaymentService.getActiveGatewayForCheckout();
+      }
 
       if (activeGateway.gatewayName === "stripe") {
         // Create Stripe payment intent
         const paymentIntent = await PaymentService.createPaymentIntent(
-          order.totalAmount,
+          Number(order.totalAmount),
           "usd",
           { orderId: order.id },
           activeGateway.gatewayId
@@ -52,7 +68,7 @@ export const createOrder = async (req: any, res: Response) => {
         // Direct credit card charging via non-Stripe providers
         const provider = PaymentProviderFactory.getProvider(activeGateway.gatewayName);
         const chargeResult = await provider.chargeCard(
-          order.totalAmount,
+          Number(order.totalAmount),
           "usd",
           orderData.cardData,
           order.id

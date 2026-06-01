@@ -15,8 +15,10 @@ export class BraintreeProvider implements PaymentProviderInterface {
       where: { gatewayName: "braintree" },
       update: {
         userId,
-        authType: "credentials",
+        authType: data.authType || "credentials",
         merchantId: data.merchantId,
+        accessToken: data.accessToken ? encrypt(data.accessToken) : null,
+        refreshToken: data.refreshToken ? encrypt(data.refreshToken) : null,
         encryptedCredentials: encrypt(credentialsStr),
         status: "CONNECTED",
         lastSyncAt: new Date()
@@ -24,8 +26,10 @@ export class BraintreeProvider implements PaymentProviderInterface {
       create: {
         userId,
         gatewayName: "braintree",
-        authType: "credentials",
+        authType: data.authType || "credentials",
         merchantId: data.merchantId,
+        accessToken: data.accessToken ? encrypt(data.accessToken) : null,
+        refreshToken: data.refreshToken ? encrypt(data.refreshToken) : null,
         encryptedCredentials: encrypt(credentialsStr),
         status: "CONNECTED",
         lastSyncAt: new Date()

@@ -13,7 +13,9 @@ export class RazorpayProvider implements PaymentProviderInterface {
       where: { gatewayName: "razorpay" },
       update: {
         userId,
-        authType: "credentials",
+        authType: data.authType || "credentials",
+        accessToken: data.accessToken ? encrypt(data.accessToken) : null,
+        refreshToken: data.refreshToken ? encrypt(data.refreshToken) : null,
         encryptedCredentials: encrypt(credentialsStr),
         status: "CONNECTED",
         lastSyncAt: new Date()
@@ -21,7 +23,9 @@ export class RazorpayProvider implements PaymentProviderInterface {
       create: {
         userId,
         gatewayName: "razorpay",
-        authType: "credentials",
+        authType: data.authType || "credentials",
+        accessToken: data.accessToken ? encrypt(data.accessToken) : null,
+        refreshToken: data.refreshToken ? encrypt(data.refreshToken) : null,
         encryptedCredentials: encrypt(credentialsStr),
         status: "CONNECTED",
         lastSyncAt: new Date()
