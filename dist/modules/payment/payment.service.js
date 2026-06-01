@@ -56,13 +56,14 @@ class PaymentService {
      */
     static async getActiveGatewayForCheckout() {
         const gateways = await prisma_1.prisma.paymentGateway.findMany({
-            where: { provider: "stripe", isActive: true },
+            where: { isActive: true },
             orderBy: { createdAt: "asc" }
         });
         if (gateways.length === 0) {
             return {
                 publishableKey: process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || process.env.STRIPE_PUBLISHABLE_KEY || "pk_test_placeholder",
-                gatewayId: "env-fallback"
+                gatewayId: "env-fallback",
+                gatewayName: "stripe"
             };
         }
         const totalCycles = gateways.reduce((acc, g) => acc + g.totalPayments, 0);
@@ -71,7 +72,8 @@ class PaymentService {
         const selectedGateway = gateways[activeIndex];
         return {
             publishableKey: selectedGateway.publishableKey || "",
-            gatewayId: selectedGateway.id
+            gatewayId: selectedGateway.id,
+            gatewayName: selectedGateway.provider
         };
     }
     static async getOrCreateCustomer(userId, gatewayId) {

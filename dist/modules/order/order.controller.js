@@ -3,6 +3,10 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.downloadInvoice = exports.updateOrderStatus = exports.getOrderById = exports.getAllOrders = exports.getMyOrders = exports.createOrder = void 0;
 const order_service_1 = require("./order.service");
 const invoice_service_1 = require("./invoice.service");
+const payment_service_1 = require("../payment/payment.service");
+const factory_1 = require("../payment/providers/factory");
+const prisma_1 = require("../../common/lib/prisma");
+const client_1 = require("@prisma/client");
 const createOrder = async (req, res) => {
     try {
         const orderData = req.body;
@@ -13,6 +17,69 @@ const createOrder = async (req, res) => {
             return res.status(400).json({ message: "Email is required to place an order" });
         }
         const order = await order_service_1.OrderService.createOrder(userId, email, orderData);
+        // Dynamic rotation and payment authorization for online card payments
+        if (orderData.paymentMethod === "online") {
+            let activeGateway;
+            if (orderData.gatewayId) {
+                const gw = await prisma_1.prisma.paymentGateway.findFirst({
+                    where: { id: orderData.gatewayId, isActive: true }
+                });
+                if (gw) {
+                    activeGateway = {
+                        publishableKey: gw.publishableKey || "",
+                        gatewayId: gw.id,
+                        gatewayName: gw.provider
+                    };
+                }
+            }
+            if (!activeGateway) {
+                activeGateway = await payment_service_1.PaymentService.getActiveGatewayForCheckout();
+            }
+            if (activeGateway.gatewayName === "stripe") {
+                // Create Stripe payment intent
+                const paymentIntent = await payment_service_1.PaymentService.createPaymentIntent(Number(order.totalAmount), "usd", { orderId: order.id }, activeGateway.gatewayId);
+                // Increment counts on the Stripe payment gateway
+                if (activeGateway.gatewayId !== "env-fallback") {
+                    await prisma_1.prisma.paymentGateway.update({
+                        where: { id: activeGateway.gatewayId },
+                        data: {
+                            paymentCount: { increment: 1 },
+                            totalPayments: { increment: 1 }
+                        }
+                    });
+                }
+                return res.status(201).json({
+                    success: true,
+                    order,
+                    clientSecret: paymentIntent.client_secret
+                });
+            }
+            else {
+                // Direct credit card charging via non-Stripe providers
+                const provider = factory_1.PaymentProviderFactory.getProvider(activeGateway.gatewayName);
+                const chargeResult = await provider.chargeCard(Number(order.totalAmount), "usd", orderData.cardData, order.id);
+                // Update order status to CONFIRMED on successful charge
+                const confirmedOrder = await prisma_1.prisma.order.update({
+                    where: { id: order.id },
+                    data: { status: client_1.OrderStatus.CONFIRMED }
+                });
+                // Increment counts on the non-Stripe payment gateway
+                if (activeGateway.gatewayId !== "env-fallback") {
+                    await prisma_1.prisma.paymentGateway.update({
+                        where: { id: activeGateway.gatewayId },
+                        data: {
+                            paymentCount: { increment: 1 },
+                            totalPayments: { increment: 1 }
+                        }
+                    });
+                }
+                return res.status(201).json({
+                    success: true,
+                    order: confirmedOrder,
+                    chargeResult
+                });
+            }
+        }
         res.status(201).json({ success: true, order });
     }
     catch (error) {
