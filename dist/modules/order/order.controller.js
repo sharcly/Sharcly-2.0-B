@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.downloadInvoice = exports.updateOrderStatus = exports.getOrderById = exports.getAllOrders = exports.getMyOrders = exports.createOrder = void 0;
+exports.downloadInvoice = exports.updateOrderStatus = exports.getOrderById = exports.previewOrder = exports.getAllOrders = exports.getMyOrders = exports.createOrder = void 0;
 const order_service_1 = require("./order.service");
 const invoice_service_1 = require("./invoice.service");
 const payment_service_1 = require("../payment/payment.service");
@@ -109,6 +109,17 @@ const getAllOrders = async (req, res) => {
     }
 };
 exports.getAllOrders = getAllOrders;
+const previewOrder = async (req, res) => {
+    try {
+        const summary = await order_service_1.OrderService.previewOrder(req.body);
+        res.status(200).json({ success: true, summary });
+    }
+    catch (error) {
+        console.error("Order preview error:", error);
+        res.status(400).json({ message: error.message || "Failed to preview order" });
+    }
+};
+exports.previewOrder = previewOrder;
 const getOrderById = async (req, res) => {
     try {
         const { id } = req.params;

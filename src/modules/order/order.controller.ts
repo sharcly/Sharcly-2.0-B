@@ -125,6 +125,16 @@ export const getAllOrders = async (req: Request, res: Response) => {
   }
 };
 
+export const previewOrder = async (req: Request, res: Response) => {
+  try {
+    const summary = await OrderService.previewOrder(req.body);
+    res.status(200).json({ success: true, summary });
+  } catch (error: any) {
+    console.error("Order preview error:", error);
+    res.status(400).json({ message: error.message || "Failed to preview order" });
+  }
+};
+
 export const getOrderById = async (req: any, res: Response) => {
   try {
     const { id } = req.params;

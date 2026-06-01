@@ -5,6 +5,8 @@ const order_controller_1 = require("./order.controller");
 const auth_middleware_1 = require("../../common/middlewares/auth.middleware");
 const validate_middleware_1 = require("../../common/middlewares/validate.middleware");
 const router = (0, express_1.Router)();
+// Public order preview endpoint
+router.post("/preview", auth_middleware_1.optionalAuth, order_controller_1.previewOrder);
 /**
  * @swagger
  * tags:

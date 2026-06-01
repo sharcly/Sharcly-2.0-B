@@ -242,6 +242,67 @@ export class OrderService {
     return order;
   }
 
+  static async previewOrder(orderData: any) {
+    const { items, couponCode } = orderData;
+    let subtotal = 0;
+
+    for (const item of items) {
+      let product = await prisma.product.findUnique({ where: { id: item.productId } });
+      let variant = null;
+
+      if (!product) {
+        variant = await prisma.productVariant.findUnique({ 
+          where: { id: item.productId }, 
+          include: { product: true } 
+        });
+        if (variant) {
+           product = variant.product;
+        } else {
+           throw new Error("One or more items in your cart are unavailable.");
+        }
+      }
+
+      const price = variant ? Number(variant.price) : Number(product.price);
+      subtotal += price * item.quantity;
+    }
+
+    let discountAmount = 0;
+    if (couponCode) {
+      const coupon = await prisma.coupon.findUnique({ where: { code: couponCode as string } });
+      if (coupon && coupon.expiryDate > new Date() && coupon.usedCount < coupon.usageLimit) {
+        if (coupon.discountType === "PERCENTAGE") {
+          discountAmount = (subtotal * Number(coupon.discount)) / 100;
+        } else {
+          discountAmount = Number(coupon.discount);
+        }
+      }
+    }
+
+    const discountedSubtotal = Math.max(0, subtotal - discountAmount);
+
+    const settings = await prisma.storeSettings.findFirst();
+    let taxAmount = 0;
+    let shippingAmount = 0;
+
+    if (settings) {
+      const taxRate = Number(settings.taxRate) || 0;
+      taxAmount = (discountedSubtotal * taxRate) / 100;
+      
+      const shippingCharge = Number(settings.shippingCharge) || 0;
+      const freeShippingThreshold = Number(settings.freeShippingThreshold) || 0;
+      shippingAmount = (freeShippingThreshold > 0 && discountedSubtotal >= freeShippingThreshold) ? 0 : shippingCharge;
+    }
+
+    const totalAmount = discountedSubtotal + taxAmount + shippingAmount;
+
+    return {
+      taxAmount,
+      shippingAmount,
+      totalAmount,
+      discountAmount
+    };
+  }
+
   static async updateOrderStatus(id: string, updateData: any) {
     const { status, trackingNumber, carrier, estimatedDelivery, notes } = updateData;
 
