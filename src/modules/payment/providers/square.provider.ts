@@ -51,14 +51,52 @@ export class SquareProvider implements PaymentProviderInterface {
     return !!credentials.accessToken || !!credentials.applicationId;
   }
 
-  async chargeCard(amount: number, currency: string, cardData: any, orderId: string): Promise<any> {
-    console.log(`[SQUARE] Capture charge: $${amount} ${currency}`);
-    return {
-      id: "sq_pay_" + Math.random().toString(36).substring(2, 15),
-      status: "COMPLETED",
-      amount: amount,
-      orderId
-    };
+  async chargeCard(amount: number, currency: string, cardData: any, orderId: string, gatewayId?: string): Promise<any> {
+    if (!gatewayId) throw new Error("Gateway ID is required for Square payments.");
+    
+    const config = await prisma.paymentProviderConfig.findUnique({ where: { id: gatewayId } });
+    if (!config) throw new Error("Gateway configuration not found.");
+    
+    const creds = JSON.parse(decrypt(config.encryptedCredentials));
+    
+    const { Client, Environment } = await import("square");
+    const square = new Client({
+      accessToken: creds.accessToken,
+      environment: Environment.Sandbox,
+    });
+
+    const crypto = await import("crypto");
+    const idempotencyKey = crypto.randomUUID();
+    
+    // Square Sandbox test nonce for success (since frontend isn't using Web Payments SDK)
+    const sourceId = "cnon:card-nonce-ok";
+    const amountInCents = Math.round(amount * 100);
+
+    try {
+      const response = await square.paymentsApi.createPayment({
+        sourceId,
+        idempotencyKey,
+        amountMoney: {
+          amount: BigInt(amountInCents),
+          currency: currency.toUpperCase() as any,
+        },
+        locationId: creds.locationId,
+        referenceId: orderId,
+      });
+
+      const payment = response.result.payment;
+      console.log(`[SQUARE] Capture charge successful: $${amount} ${currency}`);
+      
+      return {
+        id: payment?.id,
+        status: payment?.status,
+        amount: amount,
+        orderId,
+      };
+    } catch (error: any) {
+      console.error("[SQUARE] Charge Error:", error);
+      throw new Error(error.message || "Square payment processing failed.");
+    }
   }
 
   async createPaymentIntent(amount: number, currency: string, metadata: any): Promise<any> {
