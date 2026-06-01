@@ -63,7 +63,8 @@ export const createOrder = async (req: any, res: Response) => {
           Number(order.totalAmount),
           "usd",
           orderData.cardData,
-          order.id
+          order.id,
+          activeGateway.gatewayId
         );
         const confirmedOrder = await prisma.order.update({
           where: { id: order.id },

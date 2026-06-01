@@ -4,7 +4,7 @@ export interface PaymentProviderInterface {
   testConnection(credentials: any): Promise<boolean>;
   
   // Standard Checkout Methods
-  chargeCard(amount: number, currency: string, cardData: any, orderId: string): Promise<any>;
+  chargeCard(amount: number, currency: string, cardData: any, orderId: string, gatewayId?: string): Promise<any>;
   createPaymentIntent(amount: number, currency: string, metadata: any): Promise<any>;
 
   // Admin Management Sync Methods
