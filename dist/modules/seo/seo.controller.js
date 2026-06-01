@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getSitemap = exports.updateGlobalSeo = exports.getGlobalSeo = exports.bulkUpsertSeo = exports.deleteSeo = exports.upsertSeo = exports.getSeoById = exports.getAllSeo = exports.getSeoBySlug = void 0;
+exports.getRobotsTxt = exports.getSitemap = exports.updateGlobalSeo = exports.getGlobalSeo = exports.bulkUpsertSeo = exports.deleteSeo = exports.upsertSeo = exports.getSeoById = exports.getAllSeo = exports.getSeoBySlug = void 0;
 const seo_service_1 = require("./seo.service");
 const getSeoBySlug = async (req, res) => {
     try {
@@ -107,3 +107,17 @@ const getSitemap = async (req, res) => {
     }
 };
 exports.getSitemap = getSitemap;
+const getRobotsTxt = async (req, res) => {
+    try {
+        const settings = await seo_service_1.SeoService.getGlobalSettings();
+        const frontendUrl = (process.env.FRONTEND_URL || "https://sharcly.com").replace(/\/$/, "");
+        const robotsTxt = settings?.robotsTxt || `User-agent: *\nAllow: /\n\nSitemap: ${frontendUrl}/sitemap.xml`;
+        res.header("Content-Type", "text/plain");
+        res.status(200).send(robotsTxt);
+    }
+    catch (error) {
+        console.error("Failed to generate robots.txt:", error);
+        res.status(500).json({ success: false, message: "Failed to generate robots.txt" });
+    }
+};
+exports.getRobotsTxt = getRobotsTxt;
