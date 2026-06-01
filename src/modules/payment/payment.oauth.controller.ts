@@ -29,25 +29,41 @@ export const connectStripe = async (req: Request, res: Response) => {
       return res.status(response.status).json({ error: data.error_description || 'OAuth failed' });
     }
 
-    // Upsert the Stripe gateway record
-    const gateway = await prisma.paymentGateway.upsert({
-      where: { provider: 'stripe' },
-      update: {
-        secretKey: data.access_token,
-        publishableKey: data.stripe_publishable_key,
-        isActive: true,
-      },
-      create: {
-        name: data.stripe_user_id || 'Stripe Connected',
+    // Find if a Stripe gateway with this merchant/user id or the same secret key already exists
+    const existingGateway = await prisma.paymentGateway.findFirst({
+      where: {
         provider: 'stripe',
-        secretKey: data.access_token,
-        publishableKey: data.stripe_publishable_key,
-        isActive: true,
-        rotationLimit: 10,
-        paymentCount: 0,
-        totalPayments: 0,
-      },
+        OR: [
+          { name: data.stripe_user_id || undefined },
+          { secretKey: data.access_token }
+        ]
+      }
     });
+
+    let gateway;
+    if (existingGateway) {
+      gateway = await prisma.paymentGateway.update({
+        where: { id: existingGateway.id },
+        data: {
+          secretKey: data.access_token,
+          publishableKey: data.stripe_publishable_key,
+          isActive: true,
+        }
+      });
+    } else {
+      gateway = await prisma.paymentGateway.create({
+        data: {
+          name: data.stripe_user_id || 'Stripe Connected',
+          provider: 'stripe',
+          secretKey: data.access_token,
+          publishableKey: data.stripe_publishable_key,
+          isActive: true,
+          rotationLimit: 10,
+          paymentCount: 0,
+          totalPayments: 0,
+        }
+      });
+    }
 
     return res.json({
       success: true,
