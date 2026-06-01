@@ -49,6 +49,7 @@ router.get("/collections", product_controller_1.getCollections);
 router.get("/tags", product_controller_1.getTags);
 router.get("/types", product_controller_1.getTypes);
 router.get("/flavours", product_controller_1.getFlavours);
+router.get("/recommendations", product_controller_1.getRecommendations);
 router.get("/:slug", product_controller_1.getProductBySlug);
 /**
  * @swagger
@@ -100,6 +101,7 @@ router.post("/", auth_middleware_1.authenticate, (0, auth_middleware_1.authorize
  *       200:
  *         description: Product updated successfully
  */
+router.patch("/bulk", auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)("products.update"), product_controller_1.bulkUpdateProducts);
 router.patch("/:id", auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)("products.update"), cloudinary_1.upload.any(), (0, validate_middleware_1.validate)(validate_middleware_1.UpdateProductSchema), product_controller_1.updateProduct);
 /**
  * @swagger

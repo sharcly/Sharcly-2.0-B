@@ -222,4 +222,55 @@ export class AdminService {
   static async deleteIntegration(id: string) {
     return await (prisma as any).apiIntegration.delete({ where: { id } });
   }
+
+  static async getAllPaymentGateways() {
+    return await prisma.paymentGateway.findMany({
+      orderBy: { createdAt: "desc" }
+    });
+  }
+
+  static async createPaymentGateway(data: any) {
+    return await prisma.paymentGateway.create({
+      data: {
+        name: data.name,
+        provider: data.provider,
+        publishableKey: data.publishableKey,
+        secretKey: data.secretKey,
+        webhookSecret: data.webhookSecret,
+        rotationLimit: data.rotationLimit,
+        isActive: data.isActive
+      }
+    });
+  }
+
+  static async updatePaymentGateway(id: string, data: any) {
+    return await prisma.paymentGateway.update({
+      where: { id },
+      data: {
+        name: data.name,
+        provider: data.provider,
+        publishableKey: data.publishableKey,
+        secretKey: data.secretKey,
+        webhookSecret: data.webhookSecret,
+        rotationLimit: data.rotationLimit,
+        isActive: data.isActive
+      }
+    });
+  }
+
+  static async deletePaymentGateway(id: string) {
+    return await prisma.paymentGateway.delete({
+      where: { id }
+    });
+  }
+
+  static async resetPaymentGateway(id: string) {
+    return await prisma.paymentGateway.update({
+      where: { id },
+      data: {
+        paymentCount: 0,
+        totalPayments: 0
+      }
+    });
+  }
 }

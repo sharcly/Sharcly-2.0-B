@@ -73,12 +73,33 @@ export class BlogService {
   }
 
   static async updateBlog(id: string, blogData: any) {
-    const { publishedAt, ...rest } = blogData;
+    const { 
+      title, 
+      slug, 
+      content, 
+      excerpt, 
+      featuredImage, 
+      status, 
+      publishedAt, 
+      metaTitle, 
+      metaDescription, 
+      category, 
+      tags 
+    } = blogData;
     
     return await prisma.blog.update({
       where: { id },
       data: {
-        ...rest,
+        title,
+        slug,
+        content,
+        excerpt,
+        featuredImage,
+        status,
+        category,
+        tags,
+        metaTitle,
+        metaDescription,
         publishedAt: publishedAt ? new Date(publishedAt) : undefined
       }
     });
