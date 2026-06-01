@@ -73,29 +73,19 @@ export const addGateway = async (req: Request, res: Response) => {
       return res.status(400).json({ success: false, message: "Gateway name is required." });
     }
     if (!SUPPORTED_PROVIDERS.includes(provider?.toLowerCase())) {
-      return res
-        .status(400)
-        .json({ success: false, message: `Unsupported provider: ${provider}` });
+      return res.status(400).json({ success: false, message: `Unsupported provider: ${provider}` });
     }
 
     const providerKey = provider.toLowerCase();
     const required = PROVIDER_FIELDS[providerKey];
     for (const field of required) {
       if (!credentials?.[field]?.trim()) {
-        return res
-          .status(400)
-          .json({ success: false, message: `Missing required field: ${field}` });
+        return res.status(400).json({ success: false, message: `Missing required field: ${field}` });
       }
     }
 
-    // Test the connection live before saving
+    // Run connection test but DON'T block save on failure
     const test = await ProvidersService.testConnection(providerKey, credentials);
-    if (!test.success) {
-      return res.status(400).json({
-        success: false,
-        message: `Credential verification failed: ${test.error}`,
-      });
-    }
 
     const encrypted = encrypt(JSON.stringify(credentials));
     const gateway = await prisma.paymentProviderConfig.create({
@@ -104,7 +94,7 @@ export const addGateway = async (req: Request, res: Response) => {
         provider: providerKey,
         encryptedCredentials: encrypted,
         enabled: true,
-        lastVerifiedAt: new Date(),
+        lastVerifiedAt: test.success ? new Date() : null,
       },
     });
 
@@ -112,20 +102,27 @@ export const addGateway = async (req: Request, res: Response) => {
       data: {
         gatewayName: providerKey,
         action: "ADD_GATEWAY",
-        status: "SUCCESS",
-        details: `Added gateway "${name}" for provider ${providerKey}`,
+        status: test.success ? "SUCCESS" : "FAILED",
+        details: test.success
+          ? `Gateway "${name}" added and verified for provider ${providerKey}`
+          : `Gateway "${name}" added for provider ${providerKey} (verification failed: ${test.error})`,
       },
     });
 
     res.status(201).json({
       success: true,
-      message: `${providerKey.toUpperCase()} gateway "${name}" added successfully!`,
+      verified: test.success,
+      verifyWarning: test.success ? null : `Saved, but connection test failed: ${test.error}. You can still enable and use this gateway.`,
+      message: test.success
+        ? `${providerKey.toUpperCase()} gateway "${name}" added and verified!`
+        : `${providerKey.toUpperCase()} gateway "${name}" saved (credentials not verified — please test manually).`,
       gateway: { id: gateway.id, name: gateway.name, provider: gateway.provider, enabled: gateway.enabled },
     });
   } catch (err: any) {
     res.status(500).json({ success: false, message: err.message });
   }
 };
+
 
 /**
  * DELETE /api/payments/gateways/:id
