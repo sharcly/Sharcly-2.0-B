@@ -23,6 +23,11 @@ export const getProducts = async (req: Request, res: Response) => {
     if (isComingSoonQuery === "true") where.isComingSoon = true;
     if (isComingSoonQuery === "false") where.isComingSoon = false;
 
+    const flavour = req.query.flavour;
+    if (flavour) {
+      where.flavours = { some: { slug: flavour as string } };
+    }
+
     if (req.query.minPrice || req.query.maxPrice) {
       where.price = {};
       if (req.query.minPrice) where.price.gte = parseFloat(req.query.minPrice as string);
