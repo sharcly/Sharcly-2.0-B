@@ -133,7 +133,7 @@ export const addGateway = async (req: Request, res: Response) => {
  */
 export const deleteGateway = async (req: Request, res: Response) => {
   try {
-    const { id } = req.params;
+    const id = String(req.params.id);
     const existing = await prisma.paymentProviderConfig.findUnique({ where: { id } });
     if (!existing) {
       return res.status(404).json({ success: false, message: "Gateway not found." });
@@ -151,7 +151,7 @@ export const deleteGateway = async (req: Request, res: Response) => {
  */
 export const toggleGateway = async (req: Request, res: Response) => {
   try {
-    const { id } = req.params;
+    const id = String(req.params.id);
     const { enabled } = req.body as { enabled: boolean };
 
     const gateway = await prisma.paymentProviderConfig.update({
@@ -184,7 +184,7 @@ export const toggleGateway = async (req: Request, res: Response) => {
  */
 export const testGateway = async (req: Request, res: Response) => {
   try {
-    const { id } = req.params;
+    const id = String(req.params.id);
     const existing = await prisma.paymentProviderConfig.findUnique({ where: { id } });
     if (!existing) {
       return res.status(404).json({ success: false, message: "Gateway not found." });

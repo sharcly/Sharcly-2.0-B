@@ -3,6 +3,7 @@ import { OrderService } from "./order.service";
 import { InvoiceService } from "./invoice.service";
 import { PaymentService } from "../payment/payment.service";
 import { PaymentProviderFactory } from "../payment/providers/factory";
+import { decrypt } from "../../common/utils/encryption";
 import { prisma } from "../../common/lib/prisma";
 import { OrderStatus } from "@prisma/client";
 
@@ -11,7 +12,6 @@ export const createOrder = async (req: any, res: Response) => {
     const orderData = req.body;
     const userId = req.user?.id || undefined;
 
-    // Require email for guest orders
     const email = req.user?.email || req.body.email;
     if (!email) {
       return res.status(400).json({ message: "Email is required to place an order" });
@@ -19,53 +19,45 @@ export const createOrder = async (req: any, res: Response) => {
 
     const order = await OrderService.createOrder(userId, email, orderData);
 
-    // Dynamic rotation and payment authorization for online card payments
     if (orderData.paymentMethod === "online") {
-      let activeGateway;
+      let activeGateway: { publishableKey: string; gatewayId: string; gatewayName: string } | null = null;
+
+      // Use the specific gateway the customer selected on checkout
       if (orderData.gatewayId) {
-        const gw = await prisma.paymentGateway.findFirst({
-          where: { id: orderData.gatewayId, isActive: true }
+        const config = await prisma.paymentProviderConfig.findFirst({
+          where: { id: orderData.gatewayId, enabled: true }
         });
-        if (gw) {
-          activeGateway = {
-            publishableKey: gw.publishableKey || "",
-            gatewayId: gw.id,
-            gatewayName: gw.provider
-          };
+        if (config) {
+          let publishableKey = "";
+          try {
+            const creds = JSON.parse(decrypt(config.encryptedCredentials));
+            publishableKey = creds.publishableKey || creds.applicationId || creds.clientId || creds.keyId || "";
+          } catch {}
+          activeGateway = { publishableKey, gatewayId: config.id, gatewayName: config.provider };
         }
       }
 
+      // Fallback to first enabled gateway
       if (!activeGateway) {
         activeGateway = await PaymentService.getActiveGatewayForCheckout();
       }
 
       if (activeGateway.gatewayName === "stripe") {
-        // Create Stripe payment intent
+        // Order stays PENDING — confirmed only on Stripe webhook success
         const paymentIntent = await PaymentService.createPaymentIntent(
           Number(order.totalAmount),
           "usd",
           { orderId: order.id },
           activeGateway.gatewayId
         );
-
-        // Increment counts on the Stripe payment gateway
-        if (activeGateway.gatewayId !== "env-fallback") {
-          await prisma.paymentGateway.update({
-            where: { id: activeGateway.gatewayId },
-            data: {
-              paymentCount: { increment: 1 },
-              totalPayments: { increment: 1 }
-            }
-          });
-        }
-
         return res.status(201).json({
           success: true,
           order,
-          clientSecret: paymentIntent.client_secret
+          clientSecret: paymentIntent.client_secret,
+          gatewayName: "stripe"
         });
       } else {
-        // Direct credit card charging via non-Stripe providers
+        // Direct charge for non-Stripe providers
         const provider = PaymentProviderFactory.getProvider(activeGateway.gatewayName);
         const chargeResult = await provider.chargeCard(
           Number(order.totalAmount),
@@ -73,32 +65,20 @@ export const createOrder = async (req: any, res: Response) => {
           orderData.cardData,
           order.id
         );
-
-        // Update order status to CONFIRMED on successful charge
         const confirmedOrder = await prisma.order.update({
           where: { id: order.id },
           data: { status: OrderStatus.CONFIRMED }
         });
-
-        // Increment counts on the non-Stripe payment gateway
-        if (activeGateway.gatewayId !== "env-fallback") {
-          await prisma.paymentGateway.update({
-            where: { id: activeGateway.gatewayId },
-            data: {
-              paymentCount: { increment: 1 },
-              totalPayments: { increment: 1 }
-            }
-          });
-        }
-
         return res.status(201).json({
           success: true,
           order: confirmedOrder,
-          chargeResult
+          chargeResult,
+          gatewayName: activeGateway.gatewayName
         });
       }
     }
 
+    // COD or other non-online methods
     res.status(201).json({ success: true, order });
   } catch (error: any) {
     res.status(400).json({ message: error.message || "Order placement failed" });
@@ -144,16 +124,13 @@ export const getOrderById = async (req: any, res: Response) => {
       return res.status(404).json({ message: "Order not found" });
     }
 
-    // IDOR fix: only allow owner or admin/manager/authorized role with orders.view to view order
     const roleSlug = req.user?.userRole?.slug?.toLowerCase().trim();
     const userPermissions = req.user?.userRole?.permissions.map((p: any) => p.permission.slug) || [];
     const isOwner = order.userId === req.user?.id;
-    const hasOrderPermission = roleSlug === "super_admin" || 
-                              roleSlug === "admin" || 
-                              roleSlug === "manager" || 
-                              roleSlug === "seo manager" ||
-                              userPermissions.includes("orders.view") || 
-                              userPermissions.includes("orders.manage");
+    const hasOrderPermission =
+      roleSlug === "super_admin" || roleSlug === "admin" || roleSlug === "manager" ||
+      roleSlug === "seo manager" || userPermissions.includes("orders.view") ||
+      userPermissions.includes("orders.manage");
 
     if (!isOwner && !hasOrderPermission) {
       return res.status(403).json({ message: "Access denied" });
@@ -186,16 +163,13 @@ export const downloadInvoice = async (req: any, res: Response) => {
       return res.status(404).json({ message: "Order not found" });
     }
 
-    // IDOR fix: only allow owner or admin/manager/authorized role with orders.view to view order
     const roleSlug = req.user?.userRole?.slug?.toLowerCase().trim();
     const userPermissions = req.user?.userRole?.permissions.map((p: any) => p.permission.slug) || [];
     const isOwner = order.userId === req.user?.id;
-    const hasOrderPermission = roleSlug === "super_admin" || 
-                              roleSlug === "admin" || 
-                              roleSlug === "manager" || 
-                              roleSlug === "seo manager" ||
-                              userPermissions.includes("orders.view") || 
-                              userPermissions.includes("orders.manage");
+    const hasOrderPermission =
+      roleSlug === "super_admin" || roleSlug === "admin" || roleSlug === "manager" ||
+      roleSlug === "seo manager" || userPermissions.includes("orders.view") ||
+      userPermissions.includes("orders.manage");
 
     if (!isOwner && !hasOrderPermission) {
       return res.status(403).json({ message: "Access denied" });
