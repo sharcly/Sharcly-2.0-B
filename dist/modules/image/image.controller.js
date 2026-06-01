@@ -13,9 +13,20 @@ const getImage = async (req, res) => {
         if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
             return res.status(400).json({ message: "Invalid image ID format" });
         }
-        const image = await prisma_1.prisma.productImage.findUnique({
+        let image = await prisma_1.prisma.productImage.findUnique({
             where: { id: id }
         });
+        if (!image || !image.data) {
+            const cmsImg = await prisma_1.prisma.cmsImage.findUnique({
+                where: { id: id }
+            });
+            if (cmsImg) {
+                image = {
+                    data: cmsImg.data,
+                    mimeType: cmsImg.mimeType
+                };
+            }
+        }
         if (!image || !image.data) {
             return res.status(404).json({ message: "Image not found" });
         }

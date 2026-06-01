@@ -205,5 +205,51 @@ class AdminService {
     static async deleteIntegration(id) {
         return await prisma_1.prisma.apiIntegration.delete({ where: { id } });
     }
+    static async getAllPaymentGateways() {
+        return await prisma_1.prisma.paymentGateway.findMany({
+            orderBy: { createdAt: "desc" }
+        });
+    }
+    static async createPaymentGateway(data) {
+        return await prisma_1.prisma.paymentGateway.create({
+            data: {
+                name: data.name,
+                provider: data.provider,
+                publishableKey: data.publishableKey,
+                secretKey: data.secretKey,
+                webhookSecret: data.webhookSecret,
+                rotationLimit: data.rotationLimit,
+                isActive: data.isActive
+            }
+        });
+    }
+    static async updatePaymentGateway(id, data) {
+        return await prisma_1.prisma.paymentGateway.update({
+            where: { id },
+            data: {
+                name: data.name,
+                provider: data.provider,
+                publishableKey: data.publishableKey,
+                secretKey: data.secretKey,
+                webhookSecret: data.webhookSecret,
+                rotationLimit: data.rotationLimit,
+                isActive: data.isActive
+            }
+        });
+    }
+    static async deletePaymentGateway(id) {
+        return await prisma_1.prisma.paymentGateway.delete({
+            where: { id }
+        });
+    }
+    static async resetPaymentGateway(id) {
+        return await prisma_1.prisma.paymentGateway.update({
+            where: { id },
+            data: {
+                paymentCount: 0,
+                totalPayments: 0
+            }
+        });
+    }
 }
 exports.AdminService = AdminService;

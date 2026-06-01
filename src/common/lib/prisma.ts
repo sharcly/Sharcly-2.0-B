@@ -18,6 +18,10 @@ if (rawUrl) {
   }
 }
 
+if (connectionString) {
+  process.env.DATABASE_URL = connectionString;
+}
+
 const globalForPrisma = global as unknown as { prisma: PrismaClient };
 
 let prisma: PrismaClient;

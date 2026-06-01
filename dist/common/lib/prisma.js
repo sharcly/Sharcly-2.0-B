@@ -22,6 +22,9 @@ if (rawUrl) {
         console.error("Failed to parse database connection URL:", e);
     }
 }
+if (connectionString) {
+    process.env.DATABASE_URL = connectionString;
+}
 const globalForPrisma = global;
 let prisma;
 if (!globalForPrisma.prisma) {

@@ -3,7 +3,9 @@ import {
   getProducts,
   createProduct,
   getProductBySlug,
+  getRecommendations,
   updateProduct, 
+  bulkUpdateProducts,
   deleteProduct,
   getCategories,
   createCategory,
@@ -73,6 +75,7 @@ router.get("/collections", getCollections);
 router.get("/tags", getTags);
 router.get("/types", getTypes);
 router.get("/flavours", getFlavours);
+router.get("/recommendations", getRecommendations);
 router.get("/:slug", getProductBySlug);
 
 /**
@@ -126,6 +129,7 @@ router.post("/", authenticate, authorize("products.create"), upload.any(), valid
  *       200:
  *         description: Product updated successfully
  */
+router.patch("/bulk", authenticate, authorize("products.update"), bulkUpdateProducts);
 router.patch("/:id", authenticate, authorize("products.update"), upload.any(), validate(UpdateProductSchema), updateProduct);
 
 /**

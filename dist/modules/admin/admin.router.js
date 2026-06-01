@@ -143,4 +143,10 @@ router.delete("/roles/:id", admin_controller_1.deleteRole);
 router.get("/integrations", admin_controller_1.getAllIntegrations);
 router.post("/integrations", admin_controller_1.upsertIntegration);
 router.delete("/integrations/:id", admin_controller_1.deleteIntegration);
+// Payment Gateways (Stripe Account Rotations)
+router.get("/payment-gateways", admin_controller_1.getAllPaymentGateways);
+router.post("/payment-gateways", admin_controller_1.createPaymentGateway);
+router.patch("/payment-gateways/:id", admin_controller_1.updatePaymentGateway);
+router.delete("/payment-gateways/:id", admin_controller_1.deletePaymentGateway);
+router.post("/payment-gateways/:id/reset", admin_controller_1.resetPaymentGateway);
 exports.default = router;

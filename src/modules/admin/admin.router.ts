@@ -13,7 +13,12 @@ import {
   deleteRole,
   getAllIntegrations,
   upsertIntegration,
-  deleteIntegration
+  deleteIntegration,
+  getAllPaymentGateways,
+  createPaymentGateway,
+  updatePaymentGateway,
+  deletePaymentGateway,
+  resetPaymentGateway
 } from "./admin.controller";
 import { authenticate, authorize } from "../../common/middlewares/auth.middleware";
 import { validate, AdminCreateUserSchema, AdminUpdateUserSchema } from "../../common/middlewares/validate.middleware";
@@ -166,5 +171,12 @@ router.delete("/roles/:id", deleteRole);
 router.get("/integrations", getAllIntegrations);
 router.post("/integrations", upsertIntegration);
 router.delete("/integrations/:id", deleteIntegration);
+
+// Payment Gateways (Stripe Account Rotations)
+router.get("/payment-gateways", getAllPaymentGateways);
+router.post("/payment-gateways", createPaymentGateway);
+router.patch("/payment-gateways/:id", updatePaymentGateway);
+router.delete("/payment-gateways/:id", deletePaymentGateway);
+router.post("/payment-gateways/:id/reset", resetPaymentGateway);
 
 export default router;
