@@ -44,8 +44,8 @@ export class InvoiceService {
       .font("Helvetica")
       .fontSize(8)
       .text("Sharcly Hardware Store", margin, 45)
-      .text("150 Elgin Street, Ottawa, ON", margin, 55)
-      .text("Canada | hello@sharcly.com", margin, 65);
+      .text("8408 Preston Road, Plano, TX USA 75024", margin, 55)
+      .text("USA |support@sharcly.com", margin, 65);
 
     // Logo (Right)
     let logoPath = path.resolve(process.cwd(), "assets/final-Logo-1.png");
