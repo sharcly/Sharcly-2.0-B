@@ -22,7 +22,6 @@ const wholesale_router_1 = __importDefault(require("../modules/wholesale/wholesa
 const search_router_1 = __importDefault(require("../modules/search/search.router"));
 const address_router_1 = __importDefault(require("../modules/address/address.router"));
 const marketing_router_1 = __importDefault(require("../modules/marketing/marketing.router"));
-const payment_oauth_router_1 = __importDefault(require("../modules/payment/payment.oauth.router"));
 const contact_router_1 = __importDefault(require("../modules/contact/contact.router"));
 const payment_router_1 = __importDefault(require("../modules/payment/payment.router"));
 const router = (0, express_1.Router)();
@@ -44,7 +43,6 @@ router.use("/wholesale", wholesale_router_1.default);
 router.use("/search", search_router_1.default);
 router.use("/addresses", address_router_1.default);
 router.use("/marketing", marketing_router_1.default);
-router.use("/payments/oauth", payment_oauth_router_1.default);
 router.use("/contact", contact_router_1.default);
 router.use("/payments", payment_router_1.default);
 exports.default = router;

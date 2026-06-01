@@ -158,9 +158,30 @@ class SeoService {
     }
     static async updateGlobalSettings(data) {
         const settings = await this.getGlobalSettings();
+        const updateData = {};
+        if (data.siteName !== undefined)
+            updateData.name = data.siteName;
+        if (data.name !== undefined)
+            updateData.name = data.name;
+        if (data.siteDescription !== undefined)
+            updateData.siteDescription = data.siteDescription;
+        if (data.googleAnalyticsId !== undefined)
+            updateData.googleAnalyticsId = data.googleAnalyticsId;
+        if (data.facebookPixelId !== undefined)
+            updateData.facebookPixelId = data.facebookPixelId;
+        if (data.googleSiteVerification !== undefined)
+            updateData.googleSiteVerification = data.googleSiteVerification;
+        if (data.klaviyoPublicKey !== undefined)
+            updateData.klaviyoPublicKey = data.klaviyoPublicKey;
+        if (data.klaviyoPrivateKey !== undefined)
+            updateData.klaviyoPrivateKey = data.klaviyoPrivateKey;
+        if (data.robotsTxt !== undefined)
+            updateData.robotsTxt = data.robotsTxt;
+        if (data.globalMetaTags !== undefined)
+            updateData.globalMetaTags = data.globalMetaTags;
         return await prisma_1.prisma.globalSeoSettings.update({
             where: { id: settings.id },
-            data
+            data: updateData
         });
     }
 }

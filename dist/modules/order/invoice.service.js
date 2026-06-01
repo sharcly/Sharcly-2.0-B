@@ -46,11 +46,26 @@ class InvoiceService {
             .text("150 Elgin Street, Ottawa, ON", margin, 55)
             .text("Canada | hello@sharcly.com", margin, 65);
         // Logo (Right)
-        const logoPath = path_1.default.resolve(process.cwd(), "backend/assets/final-Logo-1.png");
+        let logoPath = path_1.default.resolve(process.cwd(), "assets/final-Logo-1.png");
+        if (!fs_1.default.existsSync(logoPath)) {
+            logoPath = path_1.default.resolve(process.cwd(), "backend/assets/final-Logo-1.png");
+        }
         console.log("Logo exists:", fs_1.default.existsSync(logoPath));
-        doc.image(logoPath, 180, 15, {
-            width: 80
-        });
+        if (fs_1.default.existsSync(logoPath)) {
+            doc.image(logoPath, 180, 15, {
+                width: 80
+            });
+        }
+        else {
+            doc
+                .font("Helvetica-Bold")
+                .fontSize(24)
+                .text("sharcly", pageWidth - margin - 100, 30, { align: "right", width: 100 });
+            doc
+                .fontSize(6)
+                .font("Helvetica")
+                .text("PREMIUM STREETWEAR", pageWidth - margin - 100, 55, { align: "right", width: 100 });
+        }
         // Divider
         doc.moveTo(margin, 85).lineTo(pageWidth - margin, 85).strokeColor("#eeeeee").lineWidth(1).stroke();
         // --- Bill To & Order Info ---

@@ -6,6 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.PaymentService = exports.stripe = void 0;
 const stripe_1 = __importDefault(require("stripe"));
 const prisma_1 = require("../../common/lib/prisma");
+const encryption_1 = require("../../common/utils/encryption");
 // Legacy fallback client to prevent compile errors
 exports.stripe = new stripe_1.default(process.env.STRIPE_SECRET_KEY || "sk_test_fallback", {
     apiVersion: "2023-10-16",
@@ -13,67 +14,66 @@ exports.stripe = new stripe_1.default(process.env.STRIPE_SECRET_KEY || "sk_test_
 class PaymentService {
     /**
      * Factory method to load a Stripe instance dynamically
-     * based on the provided gateway ID or the active rotation cycle.
+     * based on the provided gateway ID or the active configuration.
      */
     static async getStripeClient(gatewayId) {
+        let config = null;
         if (gatewayId && gatewayId !== "env-fallback") {
-            const gateway = await prisma_1.prisma.paymentGateway.findUnique({
+            config = await prisma_1.prisma.paymentProviderConfig.findUnique({
                 where: { id: gatewayId }
             });
-            if (gateway && gateway.isActive) {
-                return {
-                    stripe: new stripe_1.default(gateway.secretKey, { apiVersion: "2023-10-16" }),
-                    gatewayId: gateway.id
-                };
+        }
+        else {
+            config = await prisma_1.prisma.paymentProviderConfig.findFirst({
+                where: { provider: "stripe", enabled: true }
+            });
+        }
+        if (config) {
+            try {
+                const creds = JSON.parse((0, encryption_1.decrypt)(config.encryptedCredentials));
+                if (creds.secretKey) {
+                    return {
+                        stripe: new stripe_1.default(creds.secretKey, { apiVersion: "2023-10-16" }),
+                        gatewayId: config.id
+                    };
+                }
+            }
+            catch (e) {
+                console.error("[getStripeClient] decryption failed:", e);
             }
         }
-        // Resolve active Stripe gateway from database using cycle rotation
-        const gateways = await prisma_1.prisma.paymentGateway.findMany({
-            where: { provider: "stripe", isActive: true },
-            orderBy: { createdAt: "asc" }
-        });
-        if (gateways.length === 0) {
-            if (!process.env.STRIPE_SECRET_KEY) {
-                throw new Error("Stripe secret key not configured in environment or database.");
-            }
-            return {
-                stripe: new stripe_1.default(process.env.STRIPE_SECRET_KEY, { apiVersion: "2023-10-16" }),
-                gatewayId: "env-fallback"
-            };
-        }
-        // Determine target gateway based on total payments count across all active gateways
-        const totalCycles = gateways.reduce((acc, g) => acc + g.totalPayments, 0);
-        const limit = gateways[0].rotationLimit || 10;
-        const activeIndex = Math.floor(totalCycles / limit) % gateways.length;
-        const selectedGateway = gateways[activeIndex];
+        // Safety fallback key to prevent checkout errors if DB settings are empty
+        const fallbackKey = process.env.STRIPE_SECRET_KEY || "sk_test_fallback";
         return {
-            stripe: new stripe_1.default(selectedGateway.secretKey, { apiVersion: "2023-10-16" }),
-            gatewayId: selectedGateway.id
+            stripe: new stripe_1.default(fallbackKey, { apiVersion: "2023-10-16" }),
+            gatewayId: "env-fallback"
         };
     }
     /**
-     * Resolves the active Publishable Key and Gateway ID for Stripe checkout mount
+     * Resolves the active Publishable Key and Gateway ID for Stripe checkout mount.
      */
     static async getActiveGatewayForCheckout() {
-        const gateways = await prisma_1.prisma.paymentGateway.findMany({
-            where: { isActive: true },
-            orderBy: { createdAt: "asc" }
+        const config = await prisma_1.prisma.paymentProviderConfig.findFirst({
+            where: { enabled: true }
         });
-        if (gateways.length === 0) {
+        if (!config) {
+            // Return env fallback details so the checkout remains functional out of the box
             return {
                 publishableKey: process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || process.env.STRIPE_PUBLISHABLE_KEY || "pk_test_placeholder",
                 gatewayId: "env-fallback",
                 gatewayName: "stripe"
             };
         }
-        const totalCycles = gateways.reduce((acc, g) => acc + g.totalPayments, 0);
-        const limit = gateways[0].rotationLimit || 10;
-        const activeIndex = Math.floor(totalCycles / limit) % gateways.length;
-        const selectedGateway = gateways[activeIndex];
+        let publishableKey = "";
+        try {
+            const creds = JSON.parse((0, encryption_1.decrypt)(config.encryptedCredentials));
+            publishableKey = creds.publishableKey || creds.applicationId || creds.clientId || creds.keyId || "";
+        }
+        catch (e) { }
         return {
-            publishableKey: selectedGateway.publishableKey || "",
-            gatewayId: selectedGateway.id,
-            gatewayName: selectedGateway.provider
+            publishableKey,
+            gatewayId: config.id,
+            gatewayName: config.provider
         };
     }
     static async getOrCreateCustomer(userId, gatewayId) {
