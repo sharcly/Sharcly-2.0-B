@@ -343,6 +343,7 @@ model StoreSettings {
   shippingCharge        Decimal  @default(0)
   siteTheme             String   @default("light")
   taxRate               Decimal  @default(0)
+  restrictedStates      String[] @default([])
 
   @@map("store_settings")
 }
