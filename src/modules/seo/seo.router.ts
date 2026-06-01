@@ -7,7 +7,8 @@ import {
   deleteSeo,
   bulkUpsertSeo,
   getGlobalSeo,
-  updateGlobalSeo
+  updateGlobalSeo,
+  getSitemap
 } from "./seo.controller";
 import { authenticate, authorize } from "../../common/middlewares/auth.middleware";
 
@@ -19,6 +20,18 @@ const router = Router();
  *   name: SEO
  *   description: SEO Meta Management
  */
+
+/**
+ * @swagger
+ * /api/seo/sitemap.xml:
+ *   get:
+ *     summary: Get generated sitemap XML (public)
+ *     tags: [SEO]
+ *     responses:
+ *       200:
+ *         description: Sitemap XML retrieved
+ */
+router.get("/sitemap.xml", getSitemap);
 
 /**
  * @swagger

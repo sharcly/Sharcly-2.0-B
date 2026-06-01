@@ -237,6 +237,7 @@ export class AdminService {
         publishableKey: data.publishableKey,
         secretKey: data.secretKey,
         webhookSecret: data.webhookSecret,
+        config: data.config,
         rotationLimit: data.rotationLimit,
         isActive: data.isActive
       }
@@ -252,6 +253,7 @@ export class AdminService {
         publishableKey: data.publishableKey,
         secretKey: data.secretKey,
         webhookSecret: data.webhookSecret,
+        config: data.config,
         rotationLimit: data.rotationLimit,
         isActive: data.isActive
       }

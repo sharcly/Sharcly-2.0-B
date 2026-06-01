@@ -80,6 +80,72 @@ class SeoService {
             }
         })));
     }
+    static async generateSitemap() {
+        const baseUrl = (process.env.FRONTEND_URL || "https://sharcly.com").replace(/\/$/, "");
+        // Fetch active products, categories, blogs
+        const [products, categories, blogs] = await Promise.all([
+            prisma_1.prisma.product.findMany({
+                where: { status: "PUBLISHED" },
+                select: { slug: true, updatedAt: true }
+            }),
+            prisma_1.prisma.category.findMany({
+                select: { slug: true, updatedAt: true }
+            }),
+            prisma_1.prisma.blog.findMany({
+                where: { status: "PUBLISHED" },
+                select: { slug: true, updatedAt: true }
+            })
+        ]);
+        // Define static pages
+        const staticPages = [
+            { path: "", changefreq: "daily", priority: "1.0" },
+            { path: "/about", changefreq: "monthly", priority: "0.8" },
+            { path: "/contact", changefreq: "monthly", priority: "0.8" },
+            { path: "/blog", changefreq: "daily", priority: "0.9" },
+            { path: "/products", changefreq: "daily", priority: "0.9" }
+        ];
+        let xml = `<?xml version="1.0" encoding="UTF-8"?>\n`;
+        xml += `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n`;
+        const nowStr = new Date().toISOString();
+        // 1. Static Pages
+        for (const page of staticPages) {
+            xml += `  <url>\n`;
+            xml += `    <loc>${baseUrl}${page.path}</loc>\n`;
+            xml += `    <lastmod>${nowStr}</lastmod>\n`;
+            xml += `    <changefreq>${page.changefreq}</changefreq>\n`;
+            xml += `    <priority>${page.priority}</priority>\n`;
+            xml += `  </url>\n`;
+        }
+        // 2. Products
+        for (const product of products) {
+            xml += `  <url>\n`;
+            xml += `    <loc>${baseUrl}/products/${product.slug}</loc>\n`;
+            xml += `    <lastmod>${product.updatedAt.toISOString()}</lastmod>\n`;
+            xml += `    <changefreq>weekly</changefreq>\n`;
+            xml += `    <priority>0.8</priority>\n`;
+            xml += `  </url>\n`;
+        }
+        // 3. Categories
+        for (const category of categories) {
+            xml += `  <url>\n`;
+            xml += `    <loc>${baseUrl}/categories/${category.slug}</loc>\n`;
+            xml += `    <lastmod>${category.updatedAt.toISOString()}</lastmod>\n`;
+            xml += `    <changefreq>weekly</changefreq>\n`;
+            xml += `    <priority>0.7</priority>\n`;
+            xml += `  </url>\n`;
+        }
+        // 4. Blogs
+        for (const blog of blogs) {
+            xml += `  <url>\n`;
+            xml += `    <loc>${baseUrl}/blog/${blog.slug}</loc>\n`;
+            xml += `    <lastmod>${blog.updatedAt.toISOString()}</lastmod>\n`;
+            xml += `    <changefreq>weekly</changefreq>\n`;
+            xml += `    <priority>0.7</priority>\n`;
+            xml += `  </url>\n`;
+        }
+        xml += `</urlset>`;
+        return xml;
+    }
     // Global Settings
     static async getGlobalSettings() {
         let settings = await prisma_1.prisma.globalSeoSettings.findFirst();

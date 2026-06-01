@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.updateGlobalSeo = exports.getGlobalSeo = exports.bulkUpsertSeo = exports.deleteSeo = exports.upsertSeo = exports.getSeoById = exports.getAllSeo = exports.getSeoBySlug = void 0;
+exports.getSitemap = exports.updateGlobalSeo = exports.getGlobalSeo = exports.bulkUpsertSeo = exports.deleteSeo = exports.upsertSeo = exports.getSeoById = exports.getAllSeo = exports.getSeoBySlug = void 0;
 const seo_service_1 = require("./seo.service");
 const getSeoBySlug = async (req, res) => {
     try {
@@ -95,3 +95,15 @@ const updateGlobalSeo = async (req, res) => {
     }
 };
 exports.updateGlobalSeo = updateGlobalSeo;
+const getSitemap = async (req, res) => {
+    try {
+        const xml = await seo_service_1.SeoService.generateSitemap();
+        res.header("Content-Type", "application/xml");
+        res.status(200).send(xml);
+    }
+    catch (error) {
+        console.error("Failed to generate sitemap:", error);
+        res.status(500).json({ success: false, message: "Failed to generate sitemap" });
+    }
+};
+exports.getSitemap = getSitemap;

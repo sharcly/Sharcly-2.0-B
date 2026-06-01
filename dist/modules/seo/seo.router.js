@@ -12,6 +12,17 @@ const router = (0, express_1.Router)();
  */
 /**
  * @swagger
+ * /api/seo/sitemap.xml:
+ *   get:
+ *     summary: Get generated sitemap XML (public)
+ *     tags: [SEO]
+ *     responses:
+ *       200:
+ *         description: Sitemap XML retrieved
+ */
+router.get("/sitemap.xml", seo_controller_1.getSitemap);
+/**
+ * @swagger
  * /api/seo/page/{slug}:
  *   get:
  *     summary: Get SEO meta for a page (public)
