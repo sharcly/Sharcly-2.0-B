@@ -1,25 +1,32 @@
 import { Router } from "express";
-import { authenticate } from "../../common/middlewares/auth.middleware";
-import * as PaymentController from "./payment.controller";
+import { authenticate, authorize } from "../../common/middlewares/auth.middleware";
+import {
+  listGateways,
+  addGateway,
+  deleteGateway,
+  toggleGateway,
+  testGateway,
+  testCredentials,
+  getActiveKey,
+  getAuditLogs,
+} from "./payment.controller";
 import { handleWebhook } from "./webhook.controller";
 
 const router = Router();
 
-// Public endpoints
-router.get("/active-key", PaymentController.getActiveKey);
-router.post("/webhook/:gateway", handleWebhook); // Public callback receiver
+// Public — used by checkout to get active provider public key
+router.get("/active-key", getActiveKey);
 
-// Admin authenticated endpoints
-router.get("/integrations", authenticate as any, PaymentController.getIntegrations);
-router.post("/connect", authenticate as any, PaymentController.connectCredentials);
-router.post("/disconnect", authenticate as any, PaymentController.disconnectGateway);
-router.post("/test-connection", authenticate as any, PaymentController.testConnection);
-router.post("/sync", authenticate as any, PaymentController.syncTransactions);
-router.get("/audit-logs", authenticate as any, PaymentController.getAuditLogs);
+// Public — webhook receivers per provider
+router.post("/webhook/:gateway", handleWebhook);
 
-// OAuth simulator flows
-router.get("/oauth/connect/:gateway", authenticate as any, PaymentController.oauthConnect);
-router.get("/oauth/consent/:gateway", PaymentController.oauthConsentPage);
-router.get("/oauth/callback/:gateway", PaymentController.oauthCallback);
+// Admin-only — gateway management
+router.get("/gateways",         authenticate as any, listGateways);
+router.post("/gateways",        authenticate as any, addGateway);
+router.delete("/gateways/:id",  authenticate as any, deleteGateway);
+router.patch("/gateways/:id/toggle",  authenticate as any, toggleGateway);
+router.post("/gateways/:id/test",     authenticate as any, testGateway);
+router.post("/gateways/test-credentials", authenticate as any, testCredentials);
+router.get("/audit-logs",       authenticate as any, getAuditLogs);
 
 export default router;
