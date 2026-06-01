@@ -70,5 +70,27 @@ class MarketingController {
             res.status(500).json({ message: error.message });
         }
     }
+    static async getSubscribers(req, res) {
+        try {
+            const subscribers = await marketing_service_1.MarketingService.getSubscribers();
+            res.json(subscribers);
+        }
+        catch (error) {
+            res.status(500).json({ message: error.message });
+        }
+    }
+    static async subscribe(req, res) {
+        try {
+            const { email } = req.body;
+            if (!email) {
+                return res.status(400).json({ message: "Email is required" });
+            }
+            const subscription = await marketing_service_1.MarketingService.subscribe(email);
+            res.status(200).json({ success: true, message: "Subscribed successfully!", subscription });
+        }
+        catch (error) {
+            res.status(400).json({ message: error.message });
+        }
+    }
 }
 exports.MarketingController = MarketingController;
