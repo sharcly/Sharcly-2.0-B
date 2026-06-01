@@ -23,6 +23,17 @@ const router = (0, express_1.Router)();
 router.get("/sitemap.xml", seo_controller_1.getSitemap);
 /**
  * @swagger
+ * /api/seo/robots.txt:
+ *   get:
+ *     summary: Get generated robots.txt (public)
+ *     tags: [SEO]
+ *     responses:
+ *       200:
+ *         description: Robots.txt retrieved
+ */
+router.get("/robots.txt", seo_controller_1.getRobotsTxt);
+/**
+ * @swagger
  * /api/seo/page/{slug}:
  *   get:
  *     summary: Get SEO meta for a page (public)

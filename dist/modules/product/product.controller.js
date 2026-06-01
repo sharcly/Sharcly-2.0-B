@@ -190,7 +190,7 @@ const createProduct = async (req, res) => {
                 name,
                 subtitle,
                 slug: finalSlug,
-                sku,
+                sku: (sku && sku.trim() !== "") ? sku.trim() : null,
                 description,
                 status: status || "DRAFT",
                 price: parseFloat(price || "0"),
@@ -236,7 +236,7 @@ const createProduct = async (req, res) => {
                 variants: {
                     create: variantData.map((v, idx) => ({
                         title: v.title,
-                        sku: v.sku,
+                        sku: (v.sku && v.sku.trim() !== "") ? v.sku.trim() : null,
                         price: parseFloat(v.price || v.prices?.[0]?.amount || v.price || 0),
                         inventoryQuantity: parseInt(v.inventoryQuantity || v.stock || 0),
                         manageInventory: v.manageInventory === "true" || v.manageInventory === true || v.manageInventory === undefined,
@@ -339,7 +339,7 @@ const updateProduct = async (req, res) => {
                 name,
                 subtitle,
                 slug,
-                sku,
+                sku: sku !== undefined ? ((sku && sku.trim() !== "") ? sku.trim() : null) : undefined,
                 description,
                 status,
                 price: price !== undefined ? parseFloat(price) : undefined,
@@ -387,7 +387,7 @@ const updateProduct = async (req, res) => {
                     deleteMany: {},
                     create: variantData.map((v) => ({
                         title: v.title,
-                        sku: v.sku,
+                        sku: (v.sku && v.sku.trim() !== "") ? v.sku.trim() : null,
                         price: parseFloat(v.price || 0),
                         inventoryQuantity: parseInt(v.inventoryQuantity || v.stock || 0),
                         manageInventory: v.manageInventory === "true" || v.manageInventory === true || v.manageInventory === undefined,
