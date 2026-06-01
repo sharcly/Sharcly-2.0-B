@@ -5,9 +5,9 @@ import { PaymentProviderFactory } from "./providers/factory";
 import { encrypt, decrypt } from "../../common/utils/encryption";
 
 const SUPPORTED_GATEWAYS = [
-  { name: "Stripe", value: "stripe", authType: "oauth" },
+  { name: "Stripe", value: "stripe", authType: "credentials" },
   { name: "Square", value: "square", authType: "credentials" },
-  { name: "PayPal", value: "paypal", authType: "oauth" },
+  { name: "PayPal", value: "paypal", authType: "credentials" },
   { name: "Razorpay", value: "razorpay", authType: "credentials" },
   { name: "Braintree", value: "braintree", authType: "credentials" },
   { name: "Authorize.net", value: "authorizenet", authType: "credentials" }
