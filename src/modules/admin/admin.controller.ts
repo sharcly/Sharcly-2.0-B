@@ -156,3 +156,51 @@ export const deleteIntegration = async (req: Request, res: Response) => {
     res.status(500).json({ message: error.message || "Failed to delete integration" });
   }
 };
+
+export const getAllPaymentGateways = async (req: Request, res: Response) => {
+  try {
+    const gateways = await AdminService.getAllPaymentGateways();
+    res.status(200).json({ success: true, gateways });
+  } catch (error: any) {
+    res.status(500).json({ message: error.message || "Failed to fetch payment gateways" });
+  }
+};
+
+export const createPaymentGateway = async (req: Request, res: Response) => {
+  try {
+    const gateway = await AdminService.createPaymentGateway(req.body);
+    res.status(201).json({ success: true, gateway });
+  } catch (error: any) {
+    res.status(500).json({ message: error.message || "Failed to create payment gateway" });
+  }
+};
+
+export const updatePaymentGateway = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params as { id: string };
+    const gateway = await AdminService.updatePaymentGateway(id, req.body);
+    res.status(200).json({ success: true, gateway });
+  } catch (error: any) {
+    res.status(500).json({ message: error.message || "Failed to update payment gateway" });
+  }
+};
+
+export const deletePaymentGateway = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params as { id: string };
+    await AdminService.deletePaymentGateway(id);
+    res.status(200).json({ success: true, message: "Payment gateway deleted successfully" });
+  } catch (error: any) {
+    res.status(500).json({ message: error.message || "Failed to delete payment gateway" });
+  }
+};
+
+export const resetPaymentGateway = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params as { id: string };
+    await AdminService.resetPaymentGateway(id);
+    res.status(200).json({ success: true, message: "Payment gateway reset successfully" });
+  } catch (error: any) {
+    res.status(500).json({ message: error.message || "Failed to reset payment gateway" });
+  }
+};
