@@ -55,16 +55,17 @@ export class PaymentService {
   /**
    * Resolves the active Publishable Key and Gateway ID for Stripe checkout mount
    */
-  static async getActiveGatewayForCheckout(): Promise<{ publishableKey: string; gatewayId: string }> {
+  static async getActiveGatewayForCheckout(): Promise<{ publishableKey: string; gatewayId: string; gatewayName: string }> {
     const gateways = await prisma.paymentGateway.findMany({
-      where: { provider: "stripe", isActive: true },
+      where: { isActive: true },
       orderBy: { createdAt: "asc" }
     });
 
     if (gateways.length === 0) {
       return {
         publishableKey: process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || process.env.STRIPE_PUBLISHABLE_KEY || "pk_test_placeholder",
-        gatewayId: "env-fallback"
+        gatewayId: "env-fallback",
+        gatewayName: "stripe"
       };
     }
 
@@ -75,7 +76,8 @@ export class PaymentService {
 
     return {
       publishableKey: selectedGateway.publishableKey || "",
-      gatewayId: selectedGateway.id
+      gatewayId: selectedGateway.id,
+      gatewayName: selectedGateway.provider
     };
   }
 

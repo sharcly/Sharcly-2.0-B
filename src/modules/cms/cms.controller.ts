@@ -97,7 +97,7 @@ export const streamVideo = async (req: Request, res: Response) => {
       return res.status(400).json({ message: "Valid video ID is required" });
     }
 
-    const video = await CmsService.getVideoData(id);
+    const video = await CmsService.getVideoData(id as string);
     
     if (!video || !video.data) {
       return res.status(404).json({ message: "Video not found" });
@@ -124,7 +124,7 @@ export const streamVideo = async (req: Request, res: Response) => {
 export const deleteCmsVideo = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    await CmsService.deleteVideo(id);
+    await CmsService.deleteVideo(id as string);
     res.status(200).json({ success: true, message: "Video deleted successfully" });
   } catch (error: any) {
     res.status(500).json({ success: false, message: error.message });

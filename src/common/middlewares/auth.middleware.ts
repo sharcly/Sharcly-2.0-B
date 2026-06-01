@@ -31,6 +31,10 @@ function extractToken(req: Request): string | null {
   if ((req as any).cookies?.access_token) {
     return (req as any).cookies.access_token;
   }
+  // Fallback to query parameter (useful for window.open popups)
+  if (req.query.token) {
+    return req.query.token as string;
+  }
   return null;
 }
 

@@ -1,6 +1,10 @@
 import { Request, Response } from "express";
 import { OrderService } from "./order.service";
 import { InvoiceService } from "./invoice.service";
+import { PaymentService } from "../payment/payment.service";
+import { PaymentProviderFactory } from "../payment/providers/factory";
+import { prisma } from "../../common/lib/prisma";
+import { OrderStatus } from "@prisma/client";
 
 export const createOrder = async (req: any, res: Response) => {
   try {
@@ -14,6 +18,71 @@ export const createOrder = async (req: any, res: Response) => {
     }
 
     const order = await OrderService.createOrder(userId, email, orderData);
+
+    // Dynamic rotation and payment authorization for online card payments
+    if (orderData.paymentMethod === "online") {
+      const activeGateway = await PaymentService.getActiveGatewayForCheckout();
+
+      if (activeGateway.gatewayName === "stripe") {
+        // Create Stripe payment intent
+        const paymentIntent = await PaymentService.createPaymentIntent(
+          order.totalAmount,
+          "usd",
+          { orderId: order.id },
+          activeGateway.gatewayId
+        );
+
+        // Increment counts on the Stripe payment gateway
+        if (activeGateway.gatewayId !== "env-fallback") {
+          await prisma.paymentGateway.update({
+            where: { id: activeGateway.gatewayId },
+            data: {
+              paymentCount: { increment: 1 },
+              totalPayments: { increment: 1 }
+            }
+          });
+        }
+
+        return res.status(201).json({
+          success: true,
+          order,
+          clientSecret: paymentIntent.client_secret
+        });
+      } else {
+        // Direct credit card charging via non-Stripe providers
+        const provider = PaymentProviderFactory.getProvider(activeGateway.gatewayName);
+        const chargeResult = await provider.chargeCard(
+          order.totalAmount,
+          "usd",
+          orderData.cardData,
+          order.id
+        );
+
+        // Update order status to CONFIRMED on successful charge
+        const confirmedOrder = await prisma.order.update({
+          where: { id: order.id },
+          data: { status: OrderStatus.CONFIRMED }
+        });
+
+        // Increment counts on the non-Stripe payment gateway
+        if (activeGateway.gatewayId !== "env-fallback") {
+          await prisma.paymentGateway.update({
+            where: { id: activeGateway.gatewayId },
+            data: {
+              paymentCount: { increment: 1 },
+              totalPayments: { increment: 1 }
+            }
+          });
+        }
+
+        return res.status(201).json({
+          success: true,
+          order: confirmedOrder,
+          chargeResult
+        });
+      }
+    }
+
     res.status(201).json({ success: true, order });
   } catch (error: any) {
     res.status(400).json({ message: error.message || "Order placement failed" });

@@ -59,6 +59,7 @@ export const getProducts = async (req: Request, res: Response) => {
       products: products.map(p => ({
         ...p,
         price: Number(p.price),
+        isPublished: p.status === "PUBLISHED",
         variants: p.variants.map(v => ({ ...v, price: Number(v.price) })),
         // Map images to internal API URLs
         imageUrls: p.images.map(img => `/api/images/${img.id}`)
@@ -99,6 +100,7 @@ export const getProductBySlug = async (req: Request, res: Response) => {
       product: {
         ...product,
         price: Number(product.price),
+        isPublished: product.status === "PUBLISHED",
         variants: product.variants.map(v => ({ ...v, price: Number(v.price) })),
         imageUrls: product.images.map(img => `/api/images/${img.id}`)
       }
@@ -293,6 +295,7 @@ export const createProduct = async (req: Request, res: Response) => {
       product: {
         ...product,
         price: Number(product.price),
+        isPublished: product.status === "PUBLISHED",
         variants: product.variants.map((v: any) => ({ ...v, price: Number(v.price) })),
         imageUrls: product.images.map((img: any) => `/api/images/${img.id}`)
       }
@@ -455,6 +458,7 @@ export const updateProduct = async (req: Request, res: Response) => {
       product: {
         ...product,
         price: Number(product.price),
+        isPublished: product.status === "PUBLISHED",
         variants: product.variants.map((v: any) => ({ ...v, price: Number(v.price) })),
         imageUrls: product.images.map((img: any) => `/api/images/${img.id}`)
       }
@@ -462,6 +466,38 @@ export const updateProduct = async (req: Request, res: Response) => {
   } catch (error: any) {
     console.error("Product update error:", error);
     res.status(500).json({ message: "Failed to update product" });
+  }
+};
+
+export const bulkUpdateProducts = async (req: Request, res: Response) => {
+  try {
+    const { productIds, isPublished } = req.body;
+    if (!Array.isArray(productIds)) {
+      return res.status(400).json({ message: "productIds must be an array" });
+    }
+    if (isPublished === undefined) {
+      return res.status(400).json({ message: "isPublished is required" });
+    }
+
+    const status = isPublished ? "PUBLISHED" : "DRAFT";
+
+    const updateResult = await prisma.product.updateMany({
+      where: {
+        id: { in: productIds }
+      },
+      data: {
+        status
+      }
+    });
+
+    res.status(200).json({
+      success: true,
+      message: `Successfully updated ${updateResult.count} products to ${status.toLowerCase()}`,
+      count: updateResult.count
+    });
+  } catch (error: any) {
+    console.error("Bulk update products error:", error);
+    res.status(500).json({ message: "Failed to perform bulk action", error: error.message });
   }
 };
 
@@ -658,3 +694,48 @@ export const deleteFlavour = async (req: Request, res: Response) => {
     res.status(500).json({ message: "Failed to delete flavour" });
   }
 };
+
+export const getRecommendations = async (req: Request, res: Response) => {
+  try {
+    const { limit = "3", exclude = "" } = req.query;
+    
+    const limitNum = parseInt(limit as string) || 3;
+    const excludeIds = (exclude as string)
+      .split(",")
+      .map(id => id.trim())
+      .filter(id => id !== "");
+
+    const products = await prisma.product.findMany({
+      where: {
+        status: "PUBLISHED",
+        id: {
+          notIn: excludeIds
+        }
+      },
+      take: limitNum,
+      include: {
+        images: {
+          orderBy: { order: "asc" },
+          select: { id: true }
+        }
+      }
+    });
+
+    const recommendations = products.map(p => ({
+      id: p.id,
+      name: p.name,
+      price: Number(p.price),
+      slug: p.slug,
+      image: p.images[0]?.id || null
+    }));
+
+    res.status(200).json({
+      success: true,
+      recommendations
+    });
+  } catch (error: any) {
+    console.error("Get recommendations error:", error);
+    res.status(500).json({ message: "Failed to fetch recommendations", error: error.message });
+  }
+};
+

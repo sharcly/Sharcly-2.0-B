@@ -59,7 +59,7 @@ export class CmsService {
     // Create new CmsImage record
     const cmsImage = await prisma.cmsImage.create({
       data: {
-        data: optimizedData,
+        data: optimizedData as any,
         mimeType: "image/webp"
       }
     });
@@ -80,7 +80,7 @@ export class CmsService {
     // Create new CmsVideo record
     const cmsVideo = await prisma.cmsVideo.create({
       data: {
-        data: file.buffer,
+        data: file.buffer as any,
         mimeType: file.mimetype,
         purpose,
         fileName: file.originalname,
