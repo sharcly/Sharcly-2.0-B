@@ -8,7 +8,8 @@ import {
   bulkUpsertSeo,
   getGlobalSeo,
   updateGlobalSeo,
-  getSitemap
+  getSitemap,
+  getRobotsTxt
 } from "./seo.controller";
 import { authenticate, authorize } from "../../common/middlewares/auth.middleware";
 
@@ -32,6 +33,18 @@ const router = Router();
  *         description: Sitemap XML retrieved
  */
 router.get("/sitemap.xml", getSitemap);
+
+/**
+ * @swagger
+ * /api/seo/robots.txt:
+ *   get:
+ *     summary: Get generated robots.txt (public)
+ *     tags: [SEO]
+ *     responses:
+ *       200:
+ *         description: Robots.txt retrieved
+ */
+router.get("/robots.txt", getRobotsTxt);
 
 /**
  * @swagger

@@ -102,7 +102,7 @@ model Product {
   id              String           @id @default(uuid())
   name            String
   slug            String           @unique
-  sku             String?          @unique
+  sku             String?
   description     String
   price           Decimal
   stock           Int              @default(0)
@@ -152,7 +152,7 @@ model ProductVariant {
   id                String   @id @default(uuid())
   productId         String
   title             String
-  sku               String?  @unique
+  sku               String?
   price             Decimal
   inventoryQuantity Int      @default(0)
   manageInventory   Boolean  @default(true)
@@ -343,6 +343,7 @@ model StoreSettings {
   shippingCharge        Decimal  @default(0)
   siteTheme             String   @default("light")
   taxRate               Decimal  @default(0)
+  restrictedStates      String[] @default([])
 
   @@map("store_settings")
 }
@@ -627,6 +628,19 @@ model IntegrationAuditLog {
   createdAt   DateTime @default(now()) @map("created_at")
 
   @@map("integration_audit_logs")
+}
+
+model PaymentProviderConfig {
+  id                   String    @id @default(uuid())
+  name                 String    // e.g. "My Square Account 1", "Stripe Main"
+  provider             String    // 'stripe' | 'square' | 'paypal' | 'razorpay' | 'braintree' | 'authorizenet'
+  encryptedCredentials String    @map("encrypted_credentials")
+  enabled              Boolean   @default(true)
+  lastVerifiedAt       DateTime? @map("last_verified_at")
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
+
+  @@map("payment_provider_configs")
 }
 
 enum DiscountType {

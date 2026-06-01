@@ -138,7 +138,18 @@ export const authorize = (...requiredPermissions: string[]) => {
     
     // Must have at least one required permission — empty authorize() now requires admin only
     const hasPermission = requiredPermissions.length > 0 &&
-                         requiredPermissions.some(perm => userPermissions.includes(perm));
+                         requiredPermissions.some(perm => {
+                            const p = perm.toLowerCase().trim();
+                            const matches = [p];
+                            if (p.endsWith(".manage")) {
+                              const base = p.replace(".manage", "");
+                              matches.push(base.endsWith("s") ? `${base.slice(0, -1)}.manage` : `${base}s.manage`);
+                            } else if (p.endsWith(".view")) {
+                              const base = p.replace(".view", "");
+                              matches.push(base.endsWith("s") ? `${base.slice(0, -1)}.view` : `${base}s.view`);
+                            }
+                            return userPermissions.some(up => matches.includes(up.toLowerCase().trim()));
+                          });
 
     if (!hasPermission) {
       return res.status(403).json({

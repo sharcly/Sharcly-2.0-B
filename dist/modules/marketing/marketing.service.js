@@ -91,5 +91,30 @@ class MarketingService {
             orderBy: { createdAt: "desc" }
         });
     }
+    static async getSubscribers() {
+        return await prisma_1.prisma.newsletterSubscriber.findMany({
+            orderBy: { createdAt: "desc" }
+        });
+    }
+    static async subscribe(email) {
+        const normalizedEmail = email.toLowerCase().trim();
+        const existing = await prisma_1.prisma.newsletterSubscriber.findUnique({
+            where: { email: normalizedEmail }
+        });
+        if (existing) {
+            if (existing.isActive) {
+                throw new Error("You are already subscribed to our newsletter!");
+            }
+            else {
+                return await prisma_1.prisma.newsletterSubscriber.update({
+                    where: { email: normalizedEmail },
+                    data: { isActive: true }
+                });
+            }
+        }
+        return await prisma_1.prisma.newsletterSubscriber.create({
+            data: { email: normalizedEmail }
+        });
+    }
 }
 exports.MarketingService = MarketingService;

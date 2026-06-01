@@ -100,3 +100,17 @@ export const getSitemap = async (req: Request, res: Response) => {
     res.status(500).json({ success: false, message: "Failed to generate sitemap" });
   }
 };
+
+export const getRobotsTxt = async (req: Request, res: Response) => {
+  try {
+    const settings = await SeoService.getGlobalSettings();
+    const frontendUrl = (process.env.FRONTEND_URL || "https://sharcly.com").replace(/\/$/, "");
+    const robotsTxt = settings?.robotsTxt || `User-agent: *\nAllow: /\n\nSitemap: ${frontendUrl}/sitemap.xml`;
+    res.header("Content-Type", "text/plain");
+    res.status(200).send(robotsTxt);
+  } catch (error: any) {
+    console.error("Failed to generate robots.txt:", error);
+    res.status(500).json({ success: false, message: "Failed to generate robots.txt" });
+  }
+};
+

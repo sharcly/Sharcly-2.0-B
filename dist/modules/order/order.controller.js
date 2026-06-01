@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.downloadInvoice = exports.updateOrderStatus = exports.getOrderById = exports.getAllOrders = exports.getMyOrders = exports.createOrder = void 0;
+exports.downloadInvoice = exports.updateOrderStatus = exports.getOrderById = exports.previewOrder = exports.getAllOrders = exports.getMyOrders = exports.createOrder = void 0;
 const order_service_1 = require("./order.service");
 const invoice_service_1 = require("./invoice.service");
 const payment_service_1 = require("../payment/payment.service");
@@ -109,6 +109,17 @@ const getAllOrders = async (req, res) => {
     }
 };
 exports.getAllOrders = getAllOrders;
+const previewOrder = async (req, res) => {
+    try {
+        const summary = await order_service_1.OrderService.previewOrder(req.body);
+        res.status(200).json({ success: true, summary });
+    }
+    catch (error) {
+        console.error("Order preview error:", error);
+        res.status(400).json({ message: error.message || "Failed to preview order" });
+    }
+};
+exports.previewOrder = previewOrder;
 const getOrderById = async (req, res) => {
     try {
         const { id } = req.params;
@@ -116,9 +127,17 @@ const getOrderById = async (req, res) => {
         if (!order) {
             return res.status(404).json({ message: "Order not found" });
         }
-        // IDOR fix: only allow owner or admin/manager to view order
-        const isAdmin = ["admin", "manager"].includes(req.user?.userRole?.slug);
-        if (!isAdmin && order.userId !== req.user?.id) {
+        // IDOR fix: only allow owner or admin/manager/authorized role with orders.view to view order
+        const roleSlug = req.user?.userRole?.slug?.toLowerCase().trim();
+        const userPermissions = req.user?.userRole?.permissions.map((p) => p.permission.slug) || [];
+        const isOwner = order.userId === req.user?.id;
+        const hasOrderPermission = roleSlug === "super_admin" ||
+            roleSlug === "admin" ||
+            roleSlug === "manager" ||
+            roleSlug === "seo manager" ||
+            userPermissions.includes("orders.view") ||
+            userPermissions.includes("orders.manage");
+        if (!isOwner && !hasOrderPermission) {
             return res.status(403).json({ message: "Access denied" });
         }
         res.status(200).json({ success: true, order });
@@ -148,9 +167,17 @@ const downloadInvoice = async (req, res) => {
         if (!order) {
             return res.status(404).json({ message: "Order not found" });
         }
-        // IDOR fix: only allow owner or admin/manager to view order
-        const isAdmin = ["admin", "manager"].includes(req.user?.userRole?.slug);
-        if (!isAdmin && order.userId !== req.user?.id) {
+        // IDOR fix: only allow owner or admin/manager/authorized role with orders.view to view order
+        const roleSlug = req.user?.userRole?.slug?.toLowerCase().trim();
+        const userPermissions = req.user?.userRole?.permissions.map((p) => p.permission.slug) || [];
+        const isOwner = order.userId === req.user?.id;
+        const hasOrderPermission = roleSlug === "super_admin" ||
+            roleSlug === "admin" ||
+            roleSlug === "manager" ||
+            roleSlug === "seo manager" ||
+            userPermissions.includes("orders.view") ||
+            userPermissions.includes("orders.manage");
+        if (!isOwner && !hasOrderPermission) {
             return res.status(403).json({ message: "Access denied" });
         }
         res.setHeader("Content-Type", "application/pdf");

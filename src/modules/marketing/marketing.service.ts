@@ -100,4 +100,33 @@ export class MarketingService {
       orderBy: { createdAt: "desc" }
     });
   }
+
+  static async getSubscribers() {
+    return await prisma.newsletterSubscriber.findMany({
+      orderBy: { createdAt: "desc" }
+    });
+  }
+
+  static async subscribe(email: string) {
+    const normalizedEmail = email.toLowerCase().trim();
+
+    const existing = await prisma.newsletterSubscriber.findUnique({
+      where: { email: normalizedEmail }
+    });
+
+    if (existing) {
+      if (existing.isActive) {
+        throw new Error("You are already subscribed to our newsletter!");
+      } else {
+        return await prisma.newsletterSubscriber.update({
+          where: { email: normalizedEmail },
+          data: { isActive: true }
+        });
+      }
+    }
+
+    return await prisma.newsletterSubscriber.create({
+      data: { email: normalizedEmail }
+    });
+  }
 }

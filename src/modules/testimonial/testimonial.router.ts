@@ -9,10 +9,10 @@ const router = Router();
 router.get("/", TestimonialController.getAll);
 
 // Admin routes
-router.get("/admin", authenticate, authorize("admin", "manager"), TestimonialController.getAll);
-router.get("/:id", authenticate, authorize("admin", "manager"), TestimonialController.getById);
-router.post("/", authenticate, authorize("admin", "manager"), validate(TestimonialSchema), TestimonialController.create);
-router.put("/:id", authenticate, authorize("admin", "manager"), validate(TestimonialSchema), TestimonialController.update);
-router.delete("/:id", authenticate, authorize("admin", "manager"), TestimonialController.delete);
+router.get("/admin", authenticate, authorize("admin", "manager", "seo manager", "seo.manage", "cms.manage", "testimonials.view", "testimonials.manage"), TestimonialController.getAll);
+router.get("/:id", authenticate, authorize("admin", "manager", "seo manager", "seo.manage", "cms.manage", "testimonials.view", "testimonials.manage"), TestimonialController.getById);
+router.post("/", authenticate, authorize("admin", "manager", "seo manager", "seo.manage", "cms.manage", "testimonials.manage"), validate(TestimonialSchema), TestimonialController.create);
+router.put("/:id", authenticate, authorize("admin", "manager", "seo manager", "seo.manage", "cms.manage", "testimonials.manage"), validate(TestimonialSchema), TestimonialController.update);
+router.delete("/:id", authenticate, authorize("admin", "manager", "seo manager", "seo.manage", "cms.manage", "testimonials.manage"), TestimonialController.delete);
 
 export default router;
