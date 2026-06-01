@@ -102,7 +102,7 @@ model Product {
   id              String           @id @default(uuid())
   name            String
   slug            String           @unique
-  sku             String?          @unique
+  sku             String?
   description     String
   price           Decimal
   stock           Int              @default(0)
@@ -152,7 +152,7 @@ model ProductVariant {
   id                String   @id @default(uuid())
   productId         String
   title             String
-  sku               String?  @unique
+  sku               String?
   price             Decimal
   inventoryQuantity Int      @default(0)
   manageInventory   Boolean  @default(true)
