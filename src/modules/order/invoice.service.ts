@@ -1,6 +1,8 @@
 import PDFDocument from "pdfkit";
 import { Response } from "express";
 import { format } from "date-fns";
+import path from "path";
+import fs from "fs";
 
 export class InvoiceService {
   static async generateInvoiceBuffer(order: any): Promise<Buffer> {
@@ -46,15 +48,16 @@ export class InvoiceService {
       .text("Canada | hello@sharcly.com", margin, 65);
 
     // Logo (Right)
-    doc
-      .font("Helvetica-Bold")
-      .fontSize(24)
-      .text("sharcly", pageWidth - margin - 100, 30, { align: "right", width: 100 });
-    
-    doc
-      .fontSize(6)
-      .font("Helvetica")
-      .text("PREMIUM STREETWEAR", pageWidth - margin - 100, 55, { align: "right", width: 100 });
+    const logoPath = path.resolve(
+      process.cwd(),
+      "backend/assets/final-Logo-1.png"
+    );
+
+    console.log("Logo exists:", fs.existsSync(logoPath));
+
+    doc.image(logoPath, 180, 15, {
+      width: 80
+    });
 
     // Divider
     doc.moveTo(margin, 85).lineTo(pageWidth - margin, 85).strokeColor("#eeeeee").lineWidth(1).stroke();
@@ -78,7 +81,7 @@ export class InvoiceService {
     // Order Meta (Right)
     const metaX = 180;
     const metaW = pageWidth - margin - metaX;
-    
+
     // Invoice #
     doc.rect(metaX, detailTop, metaW, 20).fill("#f5f5f5");
     doc.fillColor("#000000").font("Helvetica-Bold").fontSize(7).text("INV #", metaX + 5, detailTop + 7);
@@ -118,7 +121,7 @@ export class InvoiceService {
 
     order.items.slice(0, 8).forEach((item: any, i: number) => {
       const lineTotal = Number(item.price) * item.quantity;
-      
+
       doc
         .text(item.product?.name.substring(0, 25) || "Product", col1 + 5, rowTop)
         .text(item.quantity.toString(), col3, rowTop, { align: "right", width: 25 })
@@ -136,9 +139,9 @@ export class InvoiceService {
     const totalX = 180;
     const totalW = pageWidth - margin - totalX;
     const itemsSubtotal = order.items.reduce((acc: number, item: any) => acc + (Number(item.price) * item.quantity), 0);
-    
+
     doc.fontSize(8);
-    
+
     // Subtotal
     doc.font("Helvetica-Bold").text("Subtotal", totalX, bottomTop);
     doc.font("Helvetica").text(`$${itemsSubtotal.toFixed(2)}`, totalX, bottomTop, { align: "right", width: totalW });

@@ -6,6 +6,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.InvoiceService = void 0;
 const pdfkit_1 = __importDefault(require("pdfkit"));
 const date_fns_1 = require("date-fns");
+const path_1 = __importDefault(require("path"));
+const fs_1 = __importDefault(require("fs"));
 class InvoiceService {
     static async generateInvoiceBuffer(order) {
         return new Promise((resolve, reject) => {
@@ -44,14 +46,11 @@ class InvoiceService {
             .text("150 Elgin Street, Ottawa, ON", margin, 55)
             .text("Canada | hello@sharcly.com", margin, 65);
         // Logo (Right)
-        doc
-            .font("Helvetica-Bold")
-            .fontSize(24)
-            .text("sharcly", pageWidth - margin - 100, 30, { align: "right", width: 100 });
-        doc
-            .fontSize(6)
-            .font("Helvetica")
-            .text("PREMIUM STREETWEAR", pageWidth - margin - 100, 55, { align: "right", width: 100 });
+        const logoPath = path_1.default.resolve(process.cwd(), "backend/assets/final-Logo-1.png");
+        console.log("Logo exists:", fs_1.default.existsSync(logoPath));
+        doc.image(logoPath, 180, 15, {
+            width: 80
+        });
         // Divider
         doc.moveTo(margin, 85).lineTo(pageWidth - margin, 85).strokeColor("#eeeeee").lineWidth(1).stroke();
         // --- Bill To & Order Info ---
