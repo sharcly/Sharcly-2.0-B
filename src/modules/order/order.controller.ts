@@ -144,9 +144,18 @@ export const getOrderById = async (req: any, res: Response) => {
       return res.status(404).json({ message: "Order not found" });
     }
 
-    // IDOR fix: only allow owner or admin/manager to view order
-    const isAdmin = ["admin", "manager"].includes(req.user?.userRole?.slug);
-    if (!isAdmin && order.userId !== req.user?.id) {
+    // IDOR fix: only allow owner or admin/manager/authorized role with orders.view to view order
+    const roleSlug = req.user?.userRole?.slug?.toLowerCase().trim();
+    const userPermissions = req.user?.userRole?.permissions.map((p: any) => p.permission.slug) || [];
+    const isOwner = order.userId === req.user?.id;
+    const hasOrderPermission = roleSlug === "super_admin" || 
+                              roleSlug === "admin" || 
+                              roleSlug === "manager" || 
+                              roleSlug === "seo manager" ||
+                              userPermissions.includes("orders.view") || 
+                              userPermissions.includes("orders.manage");
+
+    if (!isOwner && !hasOrderPermission) {
       return res.status(403).json({ message: "Access denied" });
     }
 
@@ -177,9 +186,18 @@ export const downloadInvoice = async (req: any, res: Response) => {
       return res.status(404).json({ message: "Order not found" });
     }
 
-    // IDOR fix: only allow owner or admin/manager to view order
-    const isAdmin = ["admin", "manager"].includes(req.user?.userRole?.slug);
-    if (!isAdmin && order.userId !== req.user?.id) {
+    // IDOR fix: only allow owner or admin/manager/authorized role with orders.view to view order
+    const roleSlug = req.user?.userRole?.slug?.toLowerCase().trim();
+    const userPermissions = req.user?.userRole?.permissions.map((p: any) => p.permission.slug) || [];
+    const isOwner = order.userId === req.user?.id;
+    const hasOrderPermission = roleSlug === "super_admin" || 
+                              roleSlug === "admin" || 
+                              roleSlug === "manager" || 
+                              roleSlug === "seo manager" ||
+                              userPermissions.includes("orders.view") || 
+                              userPermissions.includes("orders.manage");
+
+    if (!isOwner && !hasOrderPermission) {
       return res.status(403).json({ message: "Access denied" });
     }
 
