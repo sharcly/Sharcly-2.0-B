@@ -6,7 +6,7 @@ import { encrypt, decrypt } from "../../common/utils/encryption";
 
 const SUPPORTED_GATEWAYS = [
   { name: "Stripe", value: "stripe", authType: "oauth" },
-  { name: "Square", value: "square", authType: "oauth" },
+  { name: "Square", value: "square", authType: "credentials" },
   { name: "PayPal", value: "paypal", authType: "oauth" },
   { name: "Razorpay", value: "razorpay", authType: "credentials" },
   { name: "Braintree", value: "braintree", authType: "credentials" },
